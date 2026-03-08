@@ -1,0 +1,4 @@
+repository "demo@tj_cdl_unity@cloud.cn"
+  path "/"
+    br "/main"
+    co "/main"
