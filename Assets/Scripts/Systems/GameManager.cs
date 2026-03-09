@@ -9,7 +9,7 @@ public class GameManager : MonoBehaviour
 
     [Header("关卡配置")]
     [SerializeField] private string[] levelScenes = { "SampleScene" };
-    [SerializeField] private string[] levelNames = { "第一章：孤城城墙" };
+    [SerializeField] private string[] levelNames = { "第一章：演示关卡" };
     [SerializeField] private string victorySceneName = "VictoryScreen";
     [SerializeField] private string mainMenuSceneName = "MainMenu";
 
@@ -56,6 +56,11 @@ public class GameManager : MonoBehaviour
     public void LoadMainMenu()
     {
         LoadSceneWithFallback(mainMenuSceneName);
+    }
+
+    public void LoadSceneByName(string sceneName)
+    {
+        LoadSceneWithFallback(sceneName);
     }
 
     public void OnPlayerDeath(Vector2 deathPos)
@@ -147,13 +152,12 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 回退到构建列表第一个场景，避免菜单/切关直接报错。
         if (SceneManager.sceneCountInBuildSettings > 0)
         {
             SceneManager.LoadScene(0);
             return;
         }
 
-        Debug.LogError($"未找到场景: {sceneName}，且 Build Settings 为空。");
+        Debug.LogError($"未找到场景: {sceneName}，且 Build Settings 为空。\n请先把目标场景加入 Build Settings。");
     }
 }

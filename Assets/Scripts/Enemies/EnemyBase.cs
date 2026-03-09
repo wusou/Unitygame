@@ -1,3 +1,4 @@
+using System;
 using TMPro;
 using UnityEngine;
 
@@ -9,7 +10,11 @@ public abstract class EnemyBase : MonoBehaviour
     [SerializeField] protected float moveSpeed = 2.2f;
     [SerializeField] protected float detectRange = 6f;
     [SerializeField] protected float attackRange = 1.2f;
-    [SerializeField] protected LayerMask groundLayer;
+
+    [Header("游走与追击限制")]
+    [SerializeField] private float patrolHalfWidth = 4f;
+    [SerializeField] private bool useChaseLeash = true;
+    [SerializeField] private float chaseLeashDistance = 12f;
 
     [Header("血量显示")]
     [SerializeField] private bool showHealthText = true;
@@ -24,12 +29,26 @@ public abstract class EnemyBase : MonoBehaviour
     protected int facing = -1;
 
     private TextMeshPro hpText;
+    private MeshRenderer hpTextRenderer;
+    private Vector3 homePosition;
+    private EnemyStatusController statusController;
+
+    public event Action<EnemyBase> EnemyDied;
+
+    public Vector3 HomePosition => homePosition;
 
     protected virtual void Awake()
     {
         currentHealth = maxHealth;
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        statusController = GetComponent<EnemyStatusController>();
+        if (statusController == null)
+        {
+            statusController = gameObject.AddComponent<EnemyStatusController>();
+        }
+
+        homePosition = transform.position;
 
         if (showHealthText)
         {
@@ -40,11 +59,7 @@ public abstract class EnemyBase : MonoBehaviour
 
     protected virtual void Start()
     {
-        var playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-        {
-            player = playerObj.transform;
-        }
+        TryFindPlayer();
     }
 
     protected virtual void Update()
@@ -54,11 +69,7 @@ public abstract class EnemyBase : MonoBehaviour
             return;
         }
 
-        if (showHealthText && hpText != null)
-        {
-            hpText.transform.position = transform.position + healthTextOffset;
-            hpText.text = $"HP {currentHealth}/{maxHealth}";
-        }
+        UpdateHealthLabel();
 
         if (player == null)
         {
@@ -67,13 +78,16 @@ public abstract class EnemyBase : MonoBehaviour
             return;
         }
 
-        var dist = Vector2.Distance(transform.position, player.position);
-        if (dist <= attackRange)
+        var distToPlayer = Vector2.Distance(transform.position, player.position);
+        var distFromHome = Mathf.Abs(transform.position.x - homePosition.x);
+        var canChase = !useChaseLeash || distFromHome <= chaseLeashDistance;
+
+        if (distToPlayer <= attackRange && canChase)
         {
             state = EnemyState.Attack;
             Attack();
         }
-        else if (dist <= detectRange)
+        else if (distToPlayer <= detectRange && canChase)
         {
             state = EnemyState.Chase;
             Chase();
@@ -103,6 +117,11 @@ public abstract class EnemyBase : MonoBehaviour
 
     protected virtual void Chase()
     {
+        if (player == null)
+        {
+            return;
+        }
+
         var dir = player.position.x >= transform.position.x ? 1 : -1;
         MoveHorizontal(dir * moveSpeed);
     }
@@ -112,14 +131,22 @@ public abstract class EnemyBase : MonoBehaviour
 
     protected virtual void Die()
     {
+        if (state == EnemyState.Dead)
+        {
+            return;
+        }
+
         state = EnemyState.Dead;
         rb.velocity = Vector2.zero;
         rb.simulated = false;
+
         var col = GetComponent<Collider2D>();
         if (col != null)
         {
             col.enabled = false;
         }
+
+        EnemyDied?.Invoke(this);
 
         if (hpText != null)
         {
@@ -132,12 +159,45 @@ public abstract class EnemyBase : MonoBehaviour
 
     protected void MoveHorizontal(float speedX)
     {
+        speedX = ApplyPatrolLimit(speedX);
+
+        if (statusController != null)
+        {
+            speedX *= statusController.MovementMultiplier;
+        }
+
         rb.velocity = new Vector2(speedX, rb.velocity.y);
+
         if (Mathf.Abs(speedX) > Mathf.Epsilon)
         {
             facing = speedX > 0f ? 1 : -1;
             spriteRenderer.flipX = facing < 0;
         }
+    }
+
+    private float ApplyPatrolLimit(float speedX)
+    {
+        // 追击时可越过巡逻范围，但不能超出追击绳距。
+        if (state == EnemyState.Chase && useChaseLeash)
+        {
+            var fromHome = transform.position.x - homePosition.x;
+            if ((fromHome >= chaseLeashDistance && speedX > 0f) ||
+                (fromHome <= -chaseLeashDistance && speedX < 0f))
+            {
+                return 0f;
+            }
+
+            return speedX;
+        }
+
+        var dist = transform.position.x - homePosition.x;
+        if ((dist >= patrolHalfWidth && speedX > 0f) ||
+            (dist <= -patrolHalfWidth && speedX < 0f))
+        {
+            return -speedX;
+        }
+
+        return speedX;
     }
 
     private void TryFindPlayer()
@@ -149,11 +209,25 @@ public abstract class EnemyBase : MonoBehaviour
         }
     }
 
+    private void UpdateHealthLabel()
+    {
+        if (!showHealthText || hpText == null)
+        {
+            return;
+        }
+
+        hpText.transform.position = transform.position + healthTextOffset;
+        hpText.text = $"HP {currentHealth}/{maxHealth}";
+        SyncHealthTextSorting();
+    }
+
     private void CreateHealthTextIfNeeded()
     {
         hpText = GetComponentInChildren<TextMeshPro>();
         if (hpText != null)
         {
+            hpTextRenderer = hpText.GetComponent<MeshRenderer>();
+            SyncHealthTextSorting();
             return;
         }
 
@@ -167,6 +241,9 @@ public abstract class EnemyBase : MonoBehaviour
         hpText.fontSize = 24;
         hpText.color = Color.white;
         hpText.outlineWidth = 0.2f;
+        hpText.enableWordWrapping = false;
+        hpTextRenderer = hpText.GetComponent<MeshRenderer>();
+        SyncHealthTextSorting();
     }
 
     private void RefreshHealthText()
@@ -177,5 +254,16 @@ public abstract class EnemyBase : MonoBehaviour
         }
 
         hpText.text = $"HP {currentHealth}/{maxHealth}";
+    }
+
+    private void SyncHealthTextSorting()
+    {
+        if (hpTextRenderer == null || spriteRenderer == null)
+        {
+            return;
+        }
+
+        hpTextRenderer.sortingLayerID = spriteRenderer.sortingLayerID;
+        hpTextRenderer.sortingOrder = spriteRenderer.sortingOrder + 10;
     }
 }

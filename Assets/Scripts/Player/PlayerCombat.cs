@@ -10,18 +10,20 @@ public enum WeaponType
 [RequireComponent(typeof(PlayerController), typeof(Animator))]
 public class PlayerCombat : MonoBehaviour
 {
-    [Header("武器切换")]
+    [Header("武器背包")]
+    [SerializeField] private PlayerWeaponInventory inventory;
+
+    [Header("兼容旧模式：武器切换")]
     [SerializeField] private WeaponType currentWeapon = WeaponType.Melee;
     [SerializeField] private InputActionReference switchWeaponAction;
 
-    [Header("近战参数")]
+    [Header("旧模式近战参数")]
     [SerializeField] private int meleeDamage = 25;
     [SerializeField] private float meleeRange = 1.5f;
     [SerializeField] private float meleeCooldown = 0.4f;
     [SerializeField] private Transform attackPoint;
-    [SerializeField] private LayerMask enemyLayer;
 
-    [Header("远程参数")]
+    [Header("旧模式远程参数")]
     [SerializeField] private int bowDamage = 15;
     [SerializeField] private float bowCooldown = 0.6f;
     [SerializeField] private GameObject arrowPrefab;
@@ -35,13 +37,16 @@ public class PlayerCombat : MonoBehaviour
 
     private PlayerController controller;
     private Animator animator;
-    private float meleeTimer;
-    private float bowTimer;
+    private float attackCooldownTimer;
 
     private void Awake()
     {
         controller = GetComponent<PlayerController>();
         animator = GetComponent<Animator>();
+        if (inventory == null)
+        {
+            inventory = GetComponent<PlayerWeaponInventory>();
+        }
     }
 
     private void OnEnable()
@@ -60,22 +65,46 @@ public class PlayerCombat : MonoBehaviour
 
     private void Update()
     {
-        meleeTimer -= Time.deltaTime;
-        bowTimer -= Time.deltaTime;
+        attackCooldownTimer -= Time.deltaTime;
 
         if (ReadSwitchWeaponPressed())
         {
-            ToggleWeapon();
+            if (inventory != null && inventory.CurrentWeapon != null)
+            {
+                inventory.SwitchNext();
+            }
+            else
+            {
+                ToggleLegacyWeapon();
+            }
         }
 
-        if (currentWeapon == WeaponType.Melee && ReadMeleePressed() && meleeTimer <= 0f)
+        if (attackCooldownTimer > 0f)
         {
-            MeleeAttack();
+            return;
         }
 
-        if (currentWeapon == WeaponType.Bow && ReadBowPressed() && bowTimer <= 0f)
+        var wantMelee = ReadMeleePressed();
+        var wantBow = ReadBowPressed();
+        if (!wantMelee && !wantBow)
         {
-            BowAttack();
+            return;
+        }
+
+        var weapon = inventory != null ? inventory.CurrentWeapon : null;
+        if (weapon != null)
+        {
+            AttackByDefinition(weapon);
+            return;
+        }
+
+        if (currentWeapon == WeaponType.Melee)
+        {
+            LegacyMeleeAttack();
+        }
+        else
+        {
+            LegacyBowAttack();
         }
     }
 
@@ -109,31 +138,135 @@ public class PlayerCombat : MonoBehaviour
         return Input.GetKeyDown(KeyCode.K);
     }
 
-    public void ToggleWeapon()
+    private void ToggleLegacyWeapon()
     {
         currentWeapon = currentWeapon == WeaponType.Melee ? WeaponType.Bow : WeaponType.Melee;
     }
 
-    private void MeleeAttack()
+    private void AttackByDefinition(WeaponDefinition weapon)
+    {
+        if (weapon == null)
+        {
+            return;
+        }
+
+        var damage = weapon.BaseDamage + bonusDamage;
+        var cooldown = weapon.Cooldown;
+
+        for (var i = 0; i < weapon.Modifiers.Count; i++)
+        {
+            var modifier = weapon.Modifiers[i];
+            if (modifier == null)
+            {
+                continue;
+            }
+
+            damage = modifier.ModifyDamage(weapon, damage);
+            cooldown = modifier.ModifyCooldown(weapon, cooldown);
+        }
+
+        damage = Mathf.Max(1, damage);
+        cooldown = Mathf.Max(0.05f, cooldown);
+
+        switch (weapon.AttackMode)
+        {
+            case WeaponAttackMode.Projectile:
+                DoProjectileAttack(weapon, damage, cooldown);
+                break;
+            default:
+                DoMeleeAttack(weapon, damage, cooldown);
+                break;
+        }
+    }
+
+    private void DoMeleeAttack(WeaponDefinition weapon, int damage, float cooldown)
     {
         if (attackPoint == null)
         {
             return;
         }
 
-        meleeTimer = meleeCooldown;
+        attackCooldownTimer = cooldown;
         animator.SetTrigger("Attack");
 
-        // 忽略Layer配置错误，直接按组件识别敌人。
-        var hits = Physics2D.OverlapCircleAll(attackPoint.position, meleeRange);
-        foreach (var hit in hits)
+        var range = weapon.Range > 0f ? weapon.Range : meleeRange;
+        var hits = Physics2D.OverlapCircleAll(attackPoint.position, range);
+        for (var i = 0; i < hits.Length; i++)
         {
+            var hit = hits[i];
             if (hit == null || hit.gameObject == gameObject)
             {
                 continue;
             }
 
             var enemy = hit.GetComponent<EnemyBase>();
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            enemy.TakeDamage(damage);
+            ApplyModifiersOnHit(weapon, hit.gameObject);
+        }
+    }
+
+    private void DoProjectileAttack(WeaponDefinition weapon, int damage, float cooldown)
+    {
+        if (arrowSpawn == null)
+        {
+            return;
+        }
+
+        attackCooldownTimer = cooldown;
+        animator.SetTrigger("Bow");
+
+        var prefab = weapon.ProjectilePrefab != null ? weapon.ProjectilePrefab : arrowPrefab;
+        var arrowObject = prefab != null
+            ? Instantiate(prefab, arrowSpawn.position, Quaternion.identity)
+            : CreateFallbackArrow(arrowSpawn.position);
+
+        var arrow = arrowObject.GetComponent<Arrow>();
+        if (arrow != null)
+        {
+            arrow.Initialize(controller.Facing, damage, ProjectileOwner.Player);
+        }
+
+        var payload = arrowObject.GetComponent<ProjectileEffectPayload>();
+        if (payload == null)
+        {
+            payload = arrowObject.AddComponent<ProjectileEffectPayload>();
+        }
+
+        payload.Initialize(gameObject, weapon, weapon.Modifiers);
+
+        for (var i = 0; i < weapon.Modifiers.Count; i++)
+        {
+            weapon.Modifiers[i]?.OnProjectileSpawn(gameObject, arrowObject, weapon);
+        }
+    }
+
+    private void ApplyModifiersOnHit(WeaponDefinition weapon, GameObject target)
+    {
+        for (var i = 0; i < weapon.Modifiers.Count; i++)
+        {
+            weapon.Modifiers[i]?.OnHit(gameObject, target, weapon);
+        }
+    }
+
+    private void LegacyMeleeAttack()
+    {
+        attackCooldownTimer = meleeCooldown;
+        animator.SetTrigger("Attack");
+
+        if (attackPoint == null)
+        {
+            return;
+        }
+
+        var hits = Physics2D.OverlapCircleAll(attackPoint.position, meleeRange);
+        for (var i = 0; i < hits.Length; i++)
+        {
+            var enemy = hits[i].GetComponent<EnemyBase>();
             if (enemy != null)
             {
                 enemy.TakeDamage(meleeDamage + bonusDamage);
@@ -141,33 +274,25 @@ public class PlayerCombat : MonoBehaviour
         }
     }
 
-    private void BowAttack()
+    private void LegacyBowAttack()
     {
+        attackCooldownTimer = bowCooldown;
+        animator.SetTrigger("Bow");
+
         if (arrowSpawn == null)
         {
             return;
         }
 
-        bowTimer = bowCooldown;
-        animator.SetTrigger("Bow");
-
         var arrowObject = arrowPrefab != null
             ? Instantiate(arrowPrefab, arrowSpawn.position, Quaternion.identity)
             : CreateFallbackArrow(arrowSpawn.position);
 
-        if (arrowObject == null)
-        {
-            return;
-        }
-
-        var arrowScript = arrowObject.GetComponent<Arrow>();
-        if (arrowScript != null)
-        {
-            arrowScript.Initialize(controller.Facing, bowDamage + bonusDamage, ProjectileOwner.Player);
-        }
+        var arrow = arrowObject.GetComponent<Arrow>();
+        arrow?.Initialize(controller.Facing, bowDamage + bonusDamage, ProjectileOwner.Player);
     }
 
-    private GameObject CreateFallbackArrow(Vector3 spawnPosition)
+    private static GameObject CreateFallbackArrow(Vector3 spawnPosition)
     {
         var fallback = new GameObject("RuntimePlayerArrow");
         fallback.transform.position = spawnPosition;

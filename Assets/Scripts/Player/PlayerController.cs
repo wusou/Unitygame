@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -7,6 +8,7 @@ public class PlayerController : MonoBehaviour
 {
     [Header("移动参数")]
     [SerializeField] private float moveSpeed = 6.5f;
+    [SerializeField] private float crouchMoveMultiplier = 0.45f;
     [SerializeField] private float jumpForce = 11f;
     [SerializeField] private int maxJumps = 2;
 
@@ -15,12 +17,17 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float groundCheckRadius = 0.2f;
     [SerializeField] private LayerMask groundLayer;
 
+    [Header("单向平台下落")]
+    [SerializeField] private LayerMask oneWayPlatformLayer;
+    [SerializeField] private float dropDownDuration = 0.3f;
+
     [Header("Input System")]
     [SerializeField] private InputActionReference moveAction;
     [SerializeField] private InputActionReference jumpAction;
+    [SerializeField] private InputActionReference crouchAction;
 
     [Header("边界检测")]
-    [SerializeField] private bool useHorizontalBounds = false;
+    [SerializeField] private bool useHorizontalBounds;
     [SerializeField] private float minX = -50f;
     [SerializeField] private float maxX = 50f;
     [SerializeField] private bool useKillY = true;
@@ -33,15 +40,18 @@ public class PlayerController : MonoBehaviour
 
     private int jumpsLeft;
     private bool isGrounded;
+    private bool isCrouching;
     private int facing = 1;
     private bool outOfBoundsTriggered;
 
     private float moveInput;
     private bool jumpQueued;
+    private Coroutine dropRoutine;
 
     [HideInInspector] public float bonusSpeed;
 
     public int Facing => facing;
+    public bool IsCrouching => isCrouching;
 
     private void Awake()
     {
@@ -50,6 +60,8 @@ public class PlayerController : MonoBehaviour
             enabled = false;
             return;
         }
+
+        EnsureRuntimeComponents();
 
         rb = GetComponent<Rigidbody2D>();
         animator = GetComponent<Animator>();
@@ -62,12 +74,14 @@ public class PlayerController : MonoBehaviour
     {
         moveAction?.action?.Enable();
         jumpAction?.action?.Enable();
+        crouchAction?.action?.Enable();
     }
 
     private void OnDisable()
     {
         moveAction?.action?.Disable();
         jumpAction?.action?.Disable();
+        crouchAction?.action?.Disable();
     }
 
     private void Update()
@@ -75,6 +89,8 @@ public class PlayerController : MonoBehaviour
         GroundCheck();
 
         moveInput = ReadMoveInput();
+        isCrouching = ReadCrouchHeld();
+
         if (ReadJumpPressed())
         {
             jumpQueued = true;
@@ -92,15 +108,76 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        rb.velocity = new Vector2(moveInput * (moveSpeed + bonusSpeed), rb.velocity.y);
+        var speedMul = isCrouching ? crouchMoveMultiplier : 1f;
+        rb.velocity = new Vector2(moveInput * (moveSpeed + bonusSpeed) * speedMul, rb.velocity.y);
 
-        if (jumpQueued && jumpsLeft > 0)
+        if (!jumpQueued)
         {
-            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-            jumpsLeft--;
+            return;
         }
 
         jumpQueued = false;
+
+        // 蹲下+跳跃：从单向平台穿下去。
+        if (isCrouching && isGrounded && oneWayPlatformLayer.value != 0)
+        {
+            if (dropRoutine == null)
+            {
+                dropRoutine = StartCoroutine(DropDownFromOneWayPlatform());
+            }
+
+            return;
+        }
+
+        if (jumpsLeft <= 0)
+        {
+            return;
+        }
+
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+        jumpsLeft--;
+    }
+
+    private IEnumerator DropDownFromOneWayPlatform()
+    {
+        var playerLayer = gameObject.layer;
+        for (var layer = 0; layer < 32; layer++)
+        {
+            if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+            {
+                Physics2D.IgnoreLayerCollision(playerLayer, layer, true);
+            }
+        }
+
+        yield return new WaitForSeconds(dropDownDuration);
+
+        for (var layer = 0; layer < 32; layer++)
+        {
+            if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+            {
+                Physics2D.IgnoreLayerCollision(playerLayer, layer, false);
+            }
+        }
+
+        dropRoutine = null;
+    }
+
+    private void EnsureRuntimeComponents()
+    {
+        if (GetComponent<PlayerWeaponInventory>() == null)
+        {
+            gameObject.AddComponent<PlayerWeaponInventory>();
+        }
+
+        if (GetComponent<PlayerInteractor>() == null)
+        {
+            gameObject.AddComponent<PlayerInteractor>();
+        }
+
+        if (GetComponent<PlayerWallet>() == null)
+        {
+            gameObject.AddComponent<PlayerWallet>();
+        }
     }
 
     private bool ShouldDisableAsDuplicate()
@@ -214,11 +291,22 @@ public class PlayerController : MonoBehaviour
         return Input.GetButtonDown("Jump");
     }
 
+    private bool ReadCrouchHeld()
+    {
+        if (crouchAction != null && crouchAction.action != null)
+        {
+            return crouchAction.action.IsPressed();
+        }
+
+        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow);
+    }
+
     private void UpdateAnimation()
     {
         animator.SetFloat("Speed", Mathf.Abs(rb.velocity.x));
         animator.SetBool("IsGrounded", isGrounded);
         animator.SetFloat("VelocityY", rb.velocity.y);
+        animator.SetBool("IsCrouching", isCrouching);
     }
 
     private void OnDrawGizmosSelected()
@@ -237,4 +325,3 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
-

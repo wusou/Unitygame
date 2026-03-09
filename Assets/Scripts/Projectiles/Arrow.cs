@@ -45,6 +45,9 @@ public class Arrow : MonoBehaviour
             enemy?.TakeDamage(damage);
         }
 
+        var payload = GetComponent<ProjectileEffectPayload>();
+        payload?.ApplyTo(other.gameObject);
+
         Destroy(gameObject);
     }
 }
