@@ -13,6 +13,7 @@ public class WeaponDefinition : ScriptableObject
     [SerializeField] private string displayName = "Default Weapon";
     [SerializeField] private string description = "Replace with your own weapon design.";
     [SerializeField] private Sprite icon;
+    [SerializeField] private bool canDrop = true;
 
     [Header("战斗参数")]
     [SerializeField] private WeaponAttackMode attackMode = WeaponAttackMode.Melee;
@@ -28,10 +29,37 @@ public class WeaponDefinition : ScriptableObject
     public string DisplayName => displayName;
     public string Description => description;
     public Sprite Icon => icon;
+    public bool CanDrop => canDrop;
     public WeaponAttackMode AttackMode => attackMode;
     public int BaseDamage => baseDamage;
     public float Range => range;
     public float Cooldown => cooldown;
     public GameObject ProjectilePrefab => projectilePrefab;
     public IReadOnlyList<WeaponModifier> Modifiers => modifiers;
+
+    public static WeaponDefinition CreateRuntime(
+        string id,
+        string name,
+        WeaponAttackMode mode,
+        int damage,
+        float attackRange,
+        float attackCooldown,
+        GameObject projectile,
+        Sprite weaponIcon = null,
+        bool dropable = true)
+    {
+        var weapon = CreateInstance<WeaponDefinition>();
+        weapon.weaponId = string.IsNullOrWhiteSpace(id) ? "weapon.runtime" : id;
+        weapon.displayName = string.IsNullOrWhiteSpace(name) ? "Runtime Weapon" : name;
+        weapon.description = "Runtime generated fallback weapon.";
+        weapon.icon = weaponIcon;
+        weapon.canDrop = dropable;
+        weapon.attackMode = mode;
+        weapon.baseDamage = Mathf.Max(1, damage);
+        weapon.range = Mathf.Max(0.1f, attackRange);
+        weapon.cooldown = Mathf.Max(0.05f, attackCooldown);
+        weapon.projectilePrefab = projectile;
+        weapon.modifiers = new List<WeaponModifier>();
+        return weapon;
+    }
 }

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b14eb03328b2d1c4d824b584caa31523, type: 3}
+  m_Name: wpn_burn
+  m_EditorClassIdentifier: 
+  weaponId: weapon.default
+  displayName: Default Weapon
+  description: Replace with your own weapon design.
+  icon: {fileID: 21300000, guid: d8037073eabd388469724171f65434ac, type: 3}
+  canDrop: 1
+  attackMode: 0
+  baseDamage: 10
+  range: 1.5
+  cooldown: 0.5
+  projectilePrefab: {fileID: 0}
+  modifiers:
+  - {fileID: 11400000, guid: 845986bfe1493d44096083da8caa1a4c, type: 2}

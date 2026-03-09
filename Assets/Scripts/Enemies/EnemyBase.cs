@@ -15,6 +15,11 @@ public abstract class EnemyBase : MonoBehaviour
     [SerializeField] private float patrolHalfWidth = 4f;
     [SerializeField] private bool useChaseLeash = true;
     [SerializeField] private float chaseLeashDistance = 12f;
+    [SerializeField] private float returnHomeStopDistance = 0.15f;
+    [SerializeField] private float returnSpeedMultiplier = 1f;
+
+    [Header("受击表现")]
+    [SerializeField] private float knockbackDamping = 14f;
 
     [Header("血量显示")]
     [SerializeField] private bool showHealthText = true;
@@ -32,6 +37,8 @@ public abstract class EnemyBase : MonoBehaviour
     private MeshRenderer hpTextRenderer;
     private Vector3 homePosition;
     private EnemyStatusController statusController;
+
+    private float hitStunTimer;
 
     public event Action<EnemyBase> EnemyDied;
 
@@ -70,6 +77,23 @@ public abstract class EnemyBase : MonoBehaviour
         }
 
         UpdateHealthLabel();
+        UpdateHitReaction();
+
+        // 受击硬直期间暂停 AI 驱动。
+        if (hitStunTimer > 0f)
+        {
+            return;
+        }
+
+        var distFromHome = Mathf.Abs(transform.position.x - homePosition.x);
+        var exceededLeash = useChaseLeash && distFromHome > chaseLeashDistance;
+
+        if (exceededLeash || state == EnemyState.Return)
+        {
+            state = EnemyState.Return;
+            ReturnToHome();
+            return;
+        }
 
         if (player == null)
         {
@@ -79,15 +103,13 @@ public abstract class EnemyBase : MonoBehaviour
         }
 
         var distToPlayer = Vector2.Distance(transform.position, player.position);
-        var distFromHome = Mathf.Abs(transform.position.x - homePosition.x);
-        var canChase = !useChaseLeash || distFromHome <= chaseLeashDistance;
 
-        if (distToPlayer <= attackRange && canChase)
+        if (distToPlayer <= attackRange)
         {
             state = EnemyState.Attack;
             Attack();
         }
-        else if (distToPlayer <= detectRange && canChase)
+        else if (distToPlayer <= detectRange)
         {
             state = EnemyState.Chase;
             Chase();
@@ -115,6 +137,18 @@ public abstract class EnemyBase : MonoBehaviour
         }
     }
 
+    public void ApplyKnockback(Vector2 velocity, float stunDuration)
+    {
+        if (state == EnemyState.Dead)
+        {
+            return;
+        }
+
+        // 直接设置速度，确保击退手感明显。
+        rb.velocity = new Vector2(velocity.x, rb.velocity.y + velocity.y);
+        hitStunTimer = Mathf.Max(hitStunTimer, Mathf.Max(0f, stunDuration));
+    }
+
     protected virtual void Chase()
     {
         if (player == null)
@@ -124,6 +158,21 @@ public abstract class EnemyBase : MonoBehaviour
 
         var dir = player.position.x >= transform.position.x ? 1 : -1;
         MoveHorizontal(dir * moveSpeed);
+    }
+
+    protected virtual void ReturnToHome()
+    {
+        var deltaX = homePosition.x - transform.position.x;
+        if (Mathf.Abs(deltaX) <= returnHomeStopDistance)
+        {
+            transform.position = new Vector3(homePosition.x, transform.position.y, transform.position.z);
+            MoveHorizontal(0f);
+            state = EnemyState.Patrol;
+            return;
+        }
+
+        var dir = deltaX >= 0f ? 1f : -1f;
+        MoveHorizontal(dir * moveSpeed * Mathf.Max(0.1f, returnSpeedMultiplier));
     }
 
     protected abstract void Patrol();
@@ -159,6 +208,11 @@ public abstract class EnemyBase : MonoBehaviour
 
     protected void MoveHorizontal(float speedX)
     {
+        if (hitStunTimer > 0f)
+        {
+            return;
+        }
+
         speedX = ApplyPatrolLimit(speedX);
 
         if (statusController != null)
@@ -172,6 +226,24 @@ public abstract class EnemyBase : MonoBehaviour
         {
             facing = speedX > 0f ? 1 : -1;
             spriteRenderer.flipX = facing < 0;
+        }
+    }
+
+    private void UpdateHitReaction()
+    {
+        if (hitStunTimer <= 0f)
+        {
+            return;
+        }
+
+        hitStunTimer -= Time.deltaTime;
+
+        var vx = Mathf.MoveTowards(rb.velocity.x, 0f, knockbackDamping * Time.deltaTime);
+        rb.velocity = new Vector2(vx, rb.velocity.y);
+
+        if (hitStunTimer < 0f)
+        {
+            hitStunTimer = 0f;
         }
     }
 
@@ -267,3 +339,5 @@ public abstract class EnemyBase : MonoBehaviour
         hpTextRenderer.sortingOrder = spriteRenderer.sortingOrder + 10;
     }
 }
+
+

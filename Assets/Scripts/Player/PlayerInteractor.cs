@@ -43,7 +43,7 @@ public class PlayerInteractor : MonoBehaviour
             return interactAction.action.WasPressedThisFrame();
         }
 
-        return Input.GetKeyDown(KeyCode.F);
+        var keyboard = Keyboard.current; return keyboard != null && keyboard.fKey.wasPressedThisFrame;
     }
 
     private void TryInteractNearest()
@@ -98,3 +98,4 @@ public class PlayerInteractor : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, interactRadius);
     }
 }
+

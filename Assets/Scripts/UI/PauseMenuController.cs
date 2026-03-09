@@ -37,7 +37,7 @@ public class PauseMenuController : MonoBehaviour
             return;
         }
 
-        if (pauseAction == null && Input.GetKeyDown(KeyCode.Escape))
+        if (pauseAction == null && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             SetPaused(!isPaused);
         }
@@ -91,3 +91,4 @@ public class PauseMenuController : MonoBehaviour
         pauseHintText.text = "暂停: Esc";
     }
 }
+

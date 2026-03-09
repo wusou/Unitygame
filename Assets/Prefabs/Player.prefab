@@ -112,6 +112,9 @@ GameObject:
   - component: {fileID: 8510777807148196139}
   - component: {fileID: 761233821538319032}
   - component: {fileID: 3374949639580163464}
+  - component: {fileID: 7992078700830349427}
+  - component: {fileID: 5511416636316955559}
+  - component: {fileID: 4763610976988446721}
   m_Layer: 0
   m_HasEditorInfo: 1
   m_Name: Player
@@ -293,6 +296,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 6.5
+  crouchMoveMultiplier: 0.45
   jumpForce: 11
   maxJumps: 2
   groundCheck: {fileID: 2089787874481393536}
@@ -300,8 +304,13 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 64
+  oneWayPlatformLayer:
+    serializedVersion: 2
+    m_Bits: 256
+  dropDownDuration: 0.3
   moveAction: {fileID: 4985968441018033115, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   jumpAction: {fileID: 8704057690490279334, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  crouchAction: {fileID: 1720996247637943475, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   useHorizontalBounds: 1
   minX: -20
   maxX: 120
@@ -320,19 +329,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d53e0731fca54444a72481ad3cee951, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentWeapon: 0
+  inventory: {fileID: 7992078700830349427}
+  addInitialWeaponsWhenInventoryEmpty: 1
+  initialWeapon1: {fileID: 11400000, guid: a93584705dc1f084db4ef6ffb545ba04, type: 2}
+  initialWeapon2: {fileID: 11400000, guid: 45d89276a47c469499689c45fa70bb5a, type: 2}
+  autoCreateFallbackStarterWeapons: 0
+  fallbackMeleeDamage: 16
+  fallbackMeleeCooldown: 0.56
+  fallbackProjectileDamage: 11
+  fallbackProjectileCooldown: 0.62
   switchWeaponAction: {fileID: 812415134920677999, guid: 534d3345319391942a7c09a17c89f225, type: 3}
-  meleeDamage: 25
-  meleeRange: 1.5
-  meleeCooldown: 0.4
+  weaponSlot1Action: {fileID: 4158502012197560362, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  weaponSlot2Action: {fileID: -4964275491657543135, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  weaponSlot3Action: {fileID: 4319063971726499362, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  weaponSlot4Action: {fileID: -1799826024382463543, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  dropWeaponAction: {fileID: -7086743844295324226, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  droppedWeaponPickupPrefab: {fileID: 0}
+  dropSpawnPoint: {fileID: 0}
+  dropForwardDistance: 0.8
+  defaultMeleeRange: 1.5
+  fallbackProjectilePrefab: {fileID: 0}
   attackPoint: {fileID: 7927890859527963972}
-  enemyLayer:
-    serializedVersion: 2
-    m_Bits: 128
-  bowDamage: 15
-  bowCooldown: 0.6
-  arrowPrefab: {fileID: 0}
   arrowSpawn: {fileID: 5498577094908830548}
+  autoFindSpawnPointsByName: 1
   meleeAction: {fileID: 4710948825796300313, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   bowAction: {fileID: 8372177474174518618, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   bonusDamage: 0
@@ -349,3 +368,57 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 100
+  animator: {fileID: 0}
+  deathTrigger: Die
+  deathAnimationDuration: 2
+  disappearDelay: 0
+  hideAfterDeath: 1
+  respawnAfterDeath: 1
+--- !u!114 &7992078700830349427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7098672041636595590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b56389a55873f7c42af02c8d89818f61, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxWeaponSlots: 2
+  replaceOldestWhenFull: 0
+  allowDuplicateWeapons: 0
+  startingWeapons:
+  - {fileID: 11400000, guid: a93584705dc1f084db4ef6ffb545ba04, type: 2}
+  - {fileID: 11400000, guid: 45d89276a47c469499689c45fa70bb5a, type: 2}
+--- !u!114 &5511416636316955559
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7098672041636595590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3eccb4fe7d0dc2c4cbe7a28666e8c7e2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  coins: 200
+--- !u!114 &4763610976988446721
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7098672041636595590}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1cd95abbddded9a4a944692ee663c435, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  interactAction: {fileID: 1200345088282913190, guid: 534d3345319391942a7c09a17c89f225, type: 3}
+  interactRadius: 1.2
+  interactableLayer:
+    serializedVersion: 2
+    m_Bits: 0

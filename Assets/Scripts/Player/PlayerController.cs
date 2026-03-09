@@ -70,6 +70,11 @@ public class PlayerController : MonoBehaviour
         jumpsLeft = maxJumps;
     }
 
+    private void Start()
+    {
+        InventoryUIBootstrap.EnsureUI(GetComponent<PlayerWeaponInventory>());
+    }
+
     private void OnEnable()
     {
         moveAction?.action?.Enable();
@@ -178,6 +183,16 @@ public class PlayerController : MonoBehaviour
         {
             gameObject.AddComponent<PlayerWallet>();
         }
+
+        if (GetComponent<PlayerCombat>() == null)
+        {
+            gameObject.AddComponent<PlayerCombat>();
+        }
+
+        if (GetComponent<PlayerWeaponVisual>() == null)
+        {
+            gameObject.AddComponent<PlayerWeaponVisual>();
+        }
     }
 
     private bool ShouldDisableAsDuplicate()
@@ -278,7 +293,24 @@ public class PlayerController : MonoBehaviour
             return move.x;
         }
 
-        return Input.GetAxisRaw("Horizontal");
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return 0f;
+        }
+
+        var x = 0f;
+        if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed)
+        {
+            x -= 1f;
+        }
+
+        if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed)
+        {
+            x += 1f;
+        }
+
+        return Mathf.Clamp(x, -1f, 1f);
     }
 
     private bool ReadJumpPressed()
@@ -288,7 +320,15 @@ public class PlayerController : MonoBehaviour
             return jumpAction.action.WasPressedThisFrame();
         }
 
-        return Input.GetButtonDown("Jump");
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return false;
+        }
+
+        return keyboard.spaceKey.wasPressedThisFrame ||
+               keyboard.wKey.wasPressedThisFrame ||
+               keyboard.upArrowKey.wasPressedThisFrame;
     }
 
     private bool ReadCrouchHeld()
@@ -298,7 +338,13 @@ public class PlayerController : MonoBehaviour
             return crouchAction.action.IsPressed();
         }
 
-        return Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow);
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return false;
+        }
+
+        return keyboard.leftCtrlKey.isPressed || keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed;
     }
 
     private void UpdateAnimation()
@@ -325,3 +371,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
+
+
+
+

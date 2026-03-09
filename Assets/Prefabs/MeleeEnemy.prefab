@@ -26,7 +26,7 @@ Transform:
   m_GameObject: {fileID: 1796697776502184339}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2, y: 0, z: 0}
+  m_LocalPosition: {x: 5, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -58,7 +58,7 @@ Transform:
   m_GameObject: {fileID: 2814508558325966675}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2, y: 0, z: 0}
+  m_LocalPosition: {x: -5, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -77,6 +77,7 @@ GameObject:
   - component: {fileID: 8565978887785602992}
   - component: {fileID: 6735149428829698982}
   - component: {fileID: 7730353088327835818}
+  - component: {fileID: 7679301292874134628}
   m_Layer: 7
   m_HasEditorInfo: 1
   m_Name: MeleeEnemy
@@ -246,10 +247,42 @@ MonoBehaviour:
   moveSpeed: 2.2
   detectRange: 6
   attackRange: 1.2
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 64
+  patrolHalfWidth: 4
+  useChaseLeash: 1
+  chaseLeashDistance: 12
+  returnHomeStopDistance: 0.15
+  returnSpeedMultiplier: 1
+  knockbackDamping: 14
+  showHealthText: 1
+  healthTextOffset: {x: 0, y: 1.2, z: 0}
+  healthTextScale: 0.18
   leftPoint: {fileID: 7104617698487110254}
   rightPoint: {fileID: 1929722651656513346}
   attackDamage: 20
   attackCooldown: 0.8
+--- !u!114 &7679301292874134628
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3537928765598226296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f1046efb52fb004d8dfebf07582ebac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  weaponPickupPrefab: {fileID: 0}
+  noneDropProbability: 0
+  weaponDropEntries:
+  - weapon: {fileID: 11400000, guid: 8d988b4101b5c3448b96392dd26fbded, type: 2}
+    probability: 0.5
+  - weapon: {fileID: 11400000, guid: 8d988b4101b5c3448b96392dd26fbded, type: 2}
+    probability: 0.5
+  stopRollingWhenNoneDropped: 1
+  minDropCount: 1
+  maxDropCount: 1
+  avoidDuplicateInOneDeath: 1
+  dropOffsetXRange: {x: -0.6, y: 0.6}
+  dropOffsetYRange: {x: 0, y: 0.35}
+  autoPickupDroppedWeapon: 0
