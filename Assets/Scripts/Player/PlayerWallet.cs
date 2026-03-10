@@ -38,4 +38,10 @@ public class PlayerWallet : MonoBehaviour
         CoinsChanged?.Invoke(coins);
         return true;
     }
+
+    public void SetCoinsForSave(int value)
+    {
+        coins = Mathf.Max(0, value);
+        CoinsChanged?.Invoke(coins);
+    }
 }

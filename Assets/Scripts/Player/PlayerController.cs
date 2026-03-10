@@ -24,6 +24,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private bool autoDetectOneWayByEffector = true;
     [SerializeField, Min(0.5f)] private float dropDownInitialSpeed = 2f;
 
+    [Header("梯子攀爬")]
+    [SerializeField] private LayerMask ladderLayer;
+    [SerializeField] private float climbSpeed = 4.2f;
+    [SerializeField, Min(0f)] private float horizontalWhileClimbingMultiplier = 0.45f;
+    [SerializeField] private bool autoDetectLadderByAuthoring = true;
+
     [Header("Input System")]
     [SerializeField] private InputActionReference moveAction;
     [SerializeField] private InputActionReference jumpAction;
@@ -48,15 +54,21 @@ public class PlayerController : MonoBehaviour
     private bool outOfBoundsTriggered;
 
     private float moveInput;
+    private float verticalInput;
     private bool jumpQueued;
     private Coroutine dropRoutine;
     private bool isDroppingThroughOneWay;
     private readonly List<Collider2D> oneWayContacts = new();
 
+    private int ladderContacts;
+    private bool isClimbing;
+    private float defaultGravityScale;
+
     [HideInInspector] public float bonusSpeed;
 
     public int Facing => facing;
     public bool IsCrouching => isCrouching;
+    public bool IsClimbing => isClimbing;
 
     private void Awake()
     {
@@ -73,6 +85,7 @@ public class PlayerController : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         bodyCollider = GetComponent<Collider2D>();
         jumpsLeft = maxJumps;
+        defaultGravityScale = rb != null ? rb.gravityScale : 1f;
     }
 
     private void Start()
@@ -92,6 +105,8 @@ public class PlayerController : MonoBehaviour
         moveAction?.action?.Disable();
         jumpAction?.action?.Disable();
         crouchAction?.action?.Disable();
+
+        StopClimbing(resetVelocity: false);
     }
 
     private void Update()
@@ -99,12 +114,15 @@ public class PlayerController : MonoBehaviour
         GroundCheck();
 
         moveInput = ReadMoveInput();
-        isCrouching = ReadCrouchHeld();
+        verticalInput = ReadVerticalInput();
 
         if (ReadJumpPressed())
         {
             jumpQueued = true;
         }
+
+        UpdateClimbState();
+        isCrouching = !isClimbing && ReadCrouchHeld();
 
         HandleFacing();
         HandleBounds();
@@ -115,6 +133,12 @@ public class PlayerController : MonoBehaviour
     {
         if (!enabled)
         {
+            return;
+        }
+
+        if (isClimbing)
+        {
+            HandleClimbingMovement();
             return;
         }
 
@@ -146,6 +170,78 @@ public class PlayerController : MonoBehaviour
 
         rb.velocity = new Vector2(rb.velocity.x, jumpForce);
         jumpsLeft--;
+    }
+
+    private void HandleClimbingMovement()
+    {
+        var climbHorizontalMul = Mathf.Clamp(horizontalWhileClimbingMultiplier, 0f, 1f);
+        var horizontal = moveInput * (moveSpeed + bonusSpeed) * climbHorizontalMul;
+        var vertical = verticalInput * climbSpeed;
+
+        rb.gravityScale = 0f;
+        rb.velocity = new Vector2(horizontal, vertical);
+        jumpsLeft = maxJumps;
+
+        if (!jumpQueued)
+        {
+            return;
+        }
+
+        jumpQueued = false;
+        StopClimbing(resetVelocity: false);
+
+        rb.velocity = new Vector2(horizontal, jumpForce);
+        jumpsLeft = Mathf.Max(0, maxJumps - 1);
+    }
+
+    private void UpdateClimbState()
+    {
+        if (ladderContacts <= 0)
+        {
+            StopClimbing(resetVelocity: true);
+            return;
+        }
+
+        if (!isClimbing && Mathf.Abs(verticalInput) > 0.12f)
+        {
+            StartClimbing();
+        }
+    }
+
+    private void StartClimbing()
+    {
+        if (isClimbing)
+        {
+            return;
+        }
+
+        isClimbing = true;
+        rb.gravityScale = 0f;
+        rb.velocity = new Vector2(rb.velocity.x * 0.2f, 0f);
+        jumpsLeft = maxJumps;
+    }
+
+    private void StopClimbing(bool resetVelocity)
+    {
+        if (!isClimbing && rb != null)
+        {
+            rb.gravityScale = defaultGravityScale;
+            return;
+        }
+
+        isClimbing = false;
+
+        if (rb == null)
+        {
+            return;
+        }
+
+        rb.gravityScale = defaultGravityScale;
+
+        if (resetVelocity)
+        {
+            rb.velocity = new Vector2(rb.velocity.x, Mathf.Min(0f, rb.velocity.y));
+        }
     }
 
     private IEnumerator DropDownFromOneWayPlatform(Collider2D[] oneWayColliders)
@@ -271,6 +367,13 @@ public class PlayerController : MonoBehaviour
 
     private void GroundCheck()
     {
+        if (isClimbing)
+        {
+            isGrounded = true;
+            jumpsLeft = maxJumps;
+            return;
+        }
+
         if (isDroppingThroughOneWay)
         {
             isGrounded = false;
@@ -382,6 +485,50 @@ public class PlayerController : MonoBehaviour
         return effector != null && effector.useOneWay;
     }
 
+    private bool IsLadderCollider(Collider2D col)
+    {
+        if (col == null)
+        {
+            return false;
+        }
+
+        if (ladderLayer.value != 0 && ((ladderLayer.value & (1 << col.gameObject.layer)) != 0))
+        {
+            return true;
+        }
+
+        if (!autoDetectLadderByAuthoring)
+        {
+            return false;
+        }
+
+        return col.GetComponent<LadderAuthoring>() != null || col.GetComponentInParent<LadderAuthoring>() != null;
+    }
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (!IsLadderCollider(other))
+        {
+            return;
+        }
+
+        ladderContacts++;
+    }
+
+    private void OnTriggerExit2D(Collider2D other)
+    {
+        if (!IsLadderCollider(other))
+        {
+            return;
+        }
+
+        ladderContacts = Mathf.Max(0, ladderContacts - 1);
+        if (ladderContacts == 0)
+        {
+            StopClimbing(resetVelocity: true);
+        }
+    }
+
     private void HandleFacing()
     {
         if (Mathf.Abs(moveInput) <= Mathf.Epsilon)
@@ -445,6 +592,34 @@ public class PlayerController : MonoBehaviour
         }
 
         return Mathf.Clamp(x, -1f, 1f);
+    }
+
+    private float ReadVerticalInput()
+    {
+        if (moveAction != null && moveAction.action != null)
+        {
+            var move = moveAction.action.ReadValue<Vector2>();
+            return Mathf.Clamp(move.y, -1f, 1f);
+        }
+
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return 0f;
+        }
+
+        var y = 0f;
+        if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed)
+        {
+            y += 1f;
+        }
+
+        if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed)
+        {
+            y -= 1f;
+        }
+
+        return Mathf.Clamp(y, -1f, 1f);
     }
 
     private bool ReadJumpPressed()
@@ -514,16 +689,3 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

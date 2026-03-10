@@ -1,10 +1,12 @@
 using UnityEngine;
 using System.Collections;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 
 namespace TMPro.Examples
 {
-    
     public class CameraController : MonoBehaviour
     {
         public enum CameraModes { Follow, Isometric, Free }
@@ -42,9 +44,8 @@ namespace TMPro.Examples
         private Vector3 moveVector;
         private float mouseWheel;
 
-        // Controls for Touches on Mobile devices
-        //private float prev_ZoomDelta;
-
+        private const float MouseDeltaScale = 0.02f;
+        private const float MouseScrollScale = 0.01f;
 
         private const string event_SmoothingValue = "Slider - Smoothing Value";
         private const string event_FollowDistance = "Slider - Camera Zoom";
@@ -56,9 +57,6 @@ namespace TMPro.Examples
                 Application.targetFrameRate = 60;
             else
                 Application.targetFrameRate = -1;
-
-            if (Application.platform == RuntimePlatform.IPhonePlayer || Application.platform == RuntimePlatform.Android)
-                Input.simulateMouseWithTouches = false;
 
             cameraTransform = transform;
             previousSmoothing = MovementSmoothing;
@@ -116,9 +114,7 @@ namespace TMPro.Examples
                 {
                     cameraTransform.LookAt(CameraTarget);
                 }
-
             }
-
         }
 
 
@@ -128,29 +124,30 @@ namespace TMPro.Examples
             moveVector = Vector3.zero;
 
             // Check Mouse Wheel Input prior to Shift Key so we can apply multiplier on Shift for Scrolling
-            mouseWheel = Input.GetAxis("Mouse ScrollWheel");
+            mouseWheel = ReadMouseScroll();
 
-            float touchCount = Input.touchCount;
+            int touchCount = GetActiveTouchCount();
 
-            if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || touchCount > 0)
+            if (IsShiftHeld() || touchCount > 0)
             {
                 mouseWheel *= 10;
 
-                if (Input.GetKeyDown(KeyCode.I))
+                if (WasLetterPressedThisFrame('I'))
                     CameraMode = CameraModes.Isometric;
 
-                if (Input.GetKeyDown(KeyCode.F))
+                if (WasLetterPressedThisFrame('F'))
                     CameraMode = CameraModes.Follow;
 
-                if (Input.GetKeyDown(KeyCode.S))
+                if (WasLetterPressedThisFrame('S'))
                     MovementSmoothing = !MovementSmoothing;
 
 
                 // Check for right mouse button to change camera follow and elevation angle
-                if (Input.GetMouseButton(1))
+                if (IsMouseButtonPressed(1))
                 {
-                    mouseY = Input.GetAxis("Mouse Y");
-                    mouseX = Input.GetAxis("Mouse X");
+                    Vector2 mouseDelta = ReadMouseDelta();
+                    mouseY = mouseDelta.y;
+                    mouseX = mouseDelta.x;
 
                     if (mouseY > 0.01f || mouseY < -0.01f)
                     {
@@ -170,10 +167,8 @@ namespace TMPro.Examples
                 }
 
                 // Get Input from Mobile Device
-                if (touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Moved)
+                if (touchCount == 1 && TryGetTouchDelta(0, out Vector2 deltaPosition))
                 {
-                    Vector2 deltaPosition = Input.GetTouch(0).deltaPosition;
-
                     // Handle elevation changes
                     if (deltaPosition.y > 0.01f || deltaPosition.y < -0.01f)
                     {
@@ -183,7 +178,7 @@ namespace TMPro.Examples
                     }
 
 
-                    // Handle left & right 
+                    // Handle left & right
                     if (deltaPosition.x > 0.01f || deltaPosition.x < -0.01f)
                     {
                         OrbitalAngle += deltaPosition.x * 0.1f;
@@ -192,34 +187,36 @@ namespace TMPro.Examples
                         if (OrbitalAngle < 0)
                             OrbitalAngle += 360;
                     }
-
                 }
 
                 // Check for left mouse button to select a new CameraTarget or to reset Follow position
-                if (Input.GetMouseButton(0))
+                if (IsMouseButtonPressed(0))
                 {
-                    Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-                    RaycastHit hit;
-
-                    if (Physics.Raycast(ray, out hit, 300, 1 << 10 | 1 << 11 | 1 << 12 | 1 << 14))
+                    Camera mainCamera = Camera.main;
+                    if (mainCamera != null)
                     {
-                        if (hit.transform == CameraTarget)
-                        {
-                            // Reset Follow Position
-                            OrbitalAngle = 0;
-                        }
-                        else
-                        {
-                            CameraTarget = hit.transform;
-                            OrbitalAngle = 0;
-                            MovementSmoothing = previousSmoothing;
-                        }
+                        Ray ray = mainCamera.ScreenPointToRay(ReadMousePosition());
+                        RaycastHit hit;
 
+                        if (Physics.Raycast(ray, out hit, 300, 1 << 10 | 1 << 11 | 1 << 12 | 1 << 14))
+                        {
+                            if (hit.transform == CameraTarget)
+                            {
+                                // Reset Follow Position
+                                OrbitalAngle = 0;
+                            }
+                            else
+                            {
+                                CameraTarget = hit.transform;
+                                OrbitalAngle = 0;
+                                MovementSmoothing = previousSmoothing;
+                            }
+                        }
                     }
                 }
 
 
-                if (Input.GetMouseButton(2))
+                if (IsMouseButtonPressed(2))
                 {
                     if (dummyTarget == null)
                     {
@@ -242,28 +239,26 @@ namespace TMPro.Examples
                     }
 
 
-                    mouseY = Input.GetAxis("Mouse Y");
-                    mouseX = Input.GetAxis("Mouse X");
+                    Vector2 mouseDelta = ReadMouseDelta();
+                    mouseY = mouseDelta.y;
+                    mouseX = mouseDelta.x;
 
                     moveVector = cameraTransform.TransformDirection(mouseX, mouseY, 0);
 
                     dummyTarget.Translate(-moveVector, Space.World);
-
                 }
-
             }
 
             // Check Pinching to Zoom in - out on Mobile device
-            if (touchCount == 2)
+            if (touchCount == 2
+                && TryGetTouchState(0, out Vector2 touch0Position, out Vector2 touch0Delta)
+                && TryGetTouchState(1, out Vector2 touch1Position, out Vector2 touch1Delta))
             {
-                Touch touch0 = Input.GetTouch(0);
-                Touch touch1 = Input.GetTouch(1);
-
-                Vector2 touch0PrevPos = touch0.position - touch0.deltaPosition;
-                Vector2 touch1PrevPos = touch1.position - touch1.deltaPosition;
+                Vector2 touch0PrevPos = touch0Position - touch0Delta;
+                Vector2 touch1PrevPos = touch1Position - touch1Delta;
 
                 float prevTouchDelta = (touch0PrevPos - touch1PrevPos).magnitude;
-                float touchDelta = (touch0.position - touch1.position).magnitude;
+                float touchDelta = (touch0Position - touch1Position).magnitude;
 
                 float zoomDelta = prevTouchDelta - touchDelta;
 
@@ -273,20 +268,174 @@ namespace TMPro.Examples
                     // Limit FollowDistance between min & max values.
                     FollowDistance = Mathf.Clamp(FollowDistance, MinFollowDistance, MaxFollowDistance);
                 }
-
-
             }
 
             // Check MouseWheel to Zoom in-out
             if (mouseWheel < -0.01f || mouseWheel > 0.01f)
             {
-
                 FollowDistance -= mouseWheel * 5.0f;
                 // Limit FollowDistance between min & max values.
                 FollowDistance = Mathf.Clamp(FollowDistance, MinFollowDistance, MaxFollowDistance);
             }
+        }
 
 
+        private static bool IsShiftHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+#else
+            return false;
+#endif
+        }
+
+        private static bool WasLetterPressedThisFrame(char letter)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return false;
+            }
+
+            switch (char.ToUpperInvariant(letter))
+            {
+                case 'I': return keyboard.iKey.wasPressedThisFrame;
+                case 'F': return keyboard.fKey.wasPressedThisFrame;
+                case 'S': return keyboard.sKey.wasPressedThisFrame;
+                default: return false;
+            }
+#else
+            return false;
+#endif
+        }
+
+        private static bool IsMouseButtonPressed(int button)
+        {
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            if (mouse == null)
+            {
+                return false;
+            }
+
+            switch (button)
+            {
+                case 0: return mouse.leftButton.isPressed;
+                case 1: return mouse.rightButton.isPressed;
+                case 2: return mouse.middleButton.isPressed;
+                default: return false;
+            }
+#else
+            return false;
+#endif
+        }
+
+        private static Vector2 ReadMouseDelta()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            return mouse != null ? mouse.delta.ReadValue() * MouseDeltaScale : Vector2.zero;
+#else
+            return Vector2.zero;
+#endif
+        }
+
+        private static float ReadMouseScroll()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            return mouse != null ? mouse.scroll.ReadValue().y * MouseScrollScale : 0f;
+#else
+            return 0f;
+#endif
+        }
+
+        private static Vector2 ReadMousePosition()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            return mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+#else
+            return Vector2.zero;
+#endif
+        }
+
+        private static int GetActiveTouchCount()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var touchScreen = Touchscreen.current;
+            if (touchScreen == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < touchScreen.touches.Count; i++)
+            {
+                if (touchScreen.touches[i].press.isPressed)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+#else
+            return 0;
+#endif
+        }
+
+        private static bool TryGetTouchState(int activeTouchIndex, out Vector2 position, out Vector2 delta)
+        {
+            position = Vector2.zero;
+            delta = Vector2.zero;
+
+#if ENABLE_INPUT_SYSTEM
+            var touchScreen = Touchscreen.current;
+            if (touchScreen == null)
+            {
+                return false;
+            }
+
+            int currentActiveIndex = 0;
+            for (int i = 0; i < touchScreen.touches.Count; i++)
+            {
+                var touch = touchScreen.touches[i];
+                if (!touch.press.isPressed)
+                {
+                    continue;
+                }
+
+                if (currentActiveIndex == activeTouchIndex)
+                {
+                    position = touch.position.ReadValue();
+                    delta = touch.delta.ReadValue();
+                    return true;
+                }
+
+                currentActiveIndex++;
+            }
+#endif
+
+            return false;
+        }
+
+        private static bool TryGetTouchDelta(int activeTouchIndex, out Vector2 deltaPosition)
+        {
+            deltaPosition = Vector2.zero;
+            if (!TryGetTouchState(activeTouchIndex, out _, out Vector2 delta))
+            {
+                return false;
+            }
+
+            if (delta.sqrMagnitude <= 0.0001f)
+            {
+                return false;
+            }
+
+            deltaPosition = delta;
+            return true;
         }
     }
 }

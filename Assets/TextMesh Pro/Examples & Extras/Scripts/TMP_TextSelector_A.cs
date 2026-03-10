@@ -1,6 +1,9 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 
 namespace TMPro.Examples
@@ -29,9 +32,10 @@ namespace TMPro.Examples
 
         void LateUpdate()
         {
+            Vector2 pointerPosition = GetPointerPosition();
             m_isHoveringObject = false;
 
-            if (TMP_TextUtilities.IsIntersectingRectTransform(m_TextMeshPro.rectTransform, Input.mousePosition, Camera.main))
+            if (TMP_TextUtilities.IsIntersectingRectTransform(m_TextMeshPro.rectTransform, pointerPosition, Camera.main))
             {
                 m_isHoveringObject = true;
             }
@@ -39,8 +43,8 @@ namespace TMPro.Examples
             if (m_isHoveringObject)
             {
                 #region Example of Character Selection
-                int charIndex = TMP_TextUtilities.FindIntersectingCharacter(m_TextMeshPro, Input.mousePosition, Camera.main, true);
-                if (charIndex != -1 && charIndex != m_lastCharIndex && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
+                int charIndex = TMP_TextUtilities.FindIntersectingCharacter(m_TextMeshPro, pointerPosition, Camera.main, true);
+                if (charIndex != -1 && charIndex != m_lastCharIndex && IsShiftHeld())
                 {
                     //Debug.Log("[" + m_TextMeshPro.textInfo.characterInfo[charIndex].character + "] has been selected.");
 
@@ -66,7 +70,7 @@ namespace TMPro.Examples
 
                 #region Example of Link Handling
                 // Check if mouse intersects with any links.
-                int linkIndex = TMP_TextUtilities.FindIntersectingLink(m_TextMeshPro, Input.mousePosition, m_Camera);
+                int linkIndex = TMP_TextUtilities.FindIntersectingLink(m_TextMeshPro, pointerPosition, m_Camera);
 
                 // Clear previous link selection if one existed.
                 if ((linkIndex == -1 && m_selectedLink != -1) || linkIndex != m_selectedLink)
@@ -87,7 +91,7 @@ namespace TMPro.Examples
 
                     Vector3 worldPointInRectangle;
 
-                    RectTransformUtility.ScreenPointToWorldPointInRectangle(m_TextMeshPro.rectTransform, Input.mousePosition, m_Camera, out worldPointInRectangle);
+                    RectTransformUtility.ScreenPointToWorldPointInRectangle(m_TextMeshPro.rectTransform, pointerPosition, m_Camera, out worldPointInRectangle);
 
                     switch (linkInfo.GetLinkID())
                     {
@@ -108,7 +112,7 @@ namespace TMPro.Examples
 
                 #region Example of Word Selection
                 // Check if Mouse intersects any words and if so assign a random color to that word.
-                int wordIndex = TMP_TextUtilities.FindIntersectingWord(m_TextMeshPro, Input.mousePosition, Camera.main);
+                int wordIndex = TMP_TextUtilities.FindIntersectingWord(m_TextMeshPro, pointerPosition, Camera.main);
                 if (wordIndex != -1 && wordIndex != m_lastWordIndex)
                 {
                     m_lastWordIndex = wordIndex;
@@ -118,7 +122,7 @@ namespace TMPro.Examples
                     Vector3 wordPOS = m_TextMeshPro.transform.TransformPoint(m_TextMeshPro.textInfo.characterInfo[wInfo.firstCharacterIndex].bottomLeft);
                     wordPOS = Camera.main.WorldToScreenPoint(wordPOS);
 
-                    //Debug.Log("Mouse Position: " + Input.mousePosition.ToString("f3") + "  Word Position: " + wordPOS.ToString("f3"));
+                    //Debug.Log("Mouse Position: " + pointerPosition.ToString("f3") + "  Word Position: " + wordPOS.ToString("f3"));
 
                     Color32[] vertexColors = m_TextMeshPro.textInfo.meshInfo[0].colors32;
 
@@ -140,6 +144,25 @@ namespace TMPro.Examples
         }
 
 
+        private static Vector2 GetPointerPosition()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var mouse = Mouse.current;
+            return mouse != null ? mouse.position.ReadValue() : Vector2.zero;
+#else
+            return Vector2.zero;
+#endif
+        }
+
+        private static bool IsShiftHeld()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var keyboard = Keyboard.current;
+            return keyboard != null && (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+#else
+            return false;
+#endif
+        }
         public void OnPointerEnter(PointerEventData eventData)
         {
             Debug.Log("OnPointerEnter()");
@@ -155,3 +178,4 @@ namespace TMPro.Examples
 
     }
 }
+

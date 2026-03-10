@@ -16,11 +16,15 @@ public class PauseMenuController : MonoBehaviour
     [SerializeField] private GameObject pauseRoot;
     [SerializeField] private TMP_Text pauseHintText;
     [SerializeField] private Button resumeButton;
+    [SerializeField] private Button saveButton;
     [SerializeField] private Button mainMenuButton;
     [SerializeField] private Button quitButton;
     [SerializeField] private bool autoBindButtons = true;
     [SerializeField] private bool ensureEventSystem = true;
     [SerializeField] private bool showCursorWhenPaused = true;
+
+    [Header("存档")]
+    [SerializeField, Min(1)] private int saveSlotCount = 12;
 
     private bool isPaused;
     private bool cachedCursorVisible;
@@ -33,6 +37,7 @@ public class PauseMenuController : MonoBehaviour
             EnsureEventSystem();
         }
 
+        SaveGameManager.EnsureInstance().ConfigureSlotCount(saveSlotCount);
         RefreshBindings();
     }
 
@@ -68,17 +73,17 @@ public class PauseMenuController : MonoBehaviour
         {
             SetPaused(!isPaused);
         }
-
-        // 兜底快捷键：暂停时按 Q 可直接退出（编辑器内会停止 Play）。
-        if (isPaused && Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
-        {
-            QuitGame();
-        }
     }
 
     public void Resume()
     {
         SetPaused(false);
+    }
+
+    public void OpenSavePanel()
+    {
+        SaveGameManager.EnsureInstance().ConfigureSlotCount(saveSlotCount);
+        SaveSlotBrowserPanel.ShowFor(this, SavePanelMode.Save);
     }
 
     public void BackToMainMenu()
@@ -169,6 +174,7 @@ public class PauseMenuController : MonoBehaviour
         if (autoBindButtons)
         {
             TryAutoResolveButtons();
+            TryAutoCreateSaveButton();
         }
 
         RebindButtonClicks();
@@ -211,6 +217,12 @@ public class PauseMenuController : MonoBehaviour
                 continue;
             }
 
+            if (saveButton == null && ContainsAny(text, "save", "保存", "存档"))
+            {
+                saveButton = button;
+                continue;
+            }
+
             if (mainMenuButton == null && ContainsAny(text, "mainmenu", "main_menu", "menu", "主菜单", "返回菜单"))
             {
                 mainMenuButton = button;
@@ -224,12 +236,44 @@ public class PauseMenuController : MonoBehaviour
         }
     }
 
+    private void TryAutoCreateSaveButton()
+    {
+        if (saveButton != null)
+        {
+            return;
+        }
+
+        var source = resumeButton != null ? resumeButton : mainMenuButton;
+        if (source == null || source.transform.parent == null)
+        {
+            return;
+        }
+
+        var clone = Instantiate(source, source.transform.parent);
+        clone.name = "Btn_Save";
+        clone.onClick.RemoveAllListeners();
+
+        var label = clone.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.text = "存档";
+        }
+
+        saveButton = clone;
+    }
+
     private void RebindButtonClicks()
     {
         if (resumeButton != null)
         {
             resumeButton.onClick.RemoveListener(Resume);
             resumeButton.onClick.AddListener(Resume);
+        }
+
+        if (saveButton != null)
+        {
+            saveButton.onClick.RemoveListener(OpenSavePanel);
+            saveButton.onClick.AddListener(OpenSavePanel);
         }
 
         if (mainMenuButton != null)

@@ -52,6 +52,13 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    public void RestoreHealthForSave(int value)
+    {
+        currentHealth = Mathf.Clamp(value, 1, maxHealth);
+        isAlive = true;
+        HealthChanged?.Invoke(currentHealth, maxHealth);
+    }
+
     private void Die()
     {
         if (!isAlive)

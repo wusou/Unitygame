@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -14,8 +15,12 @@ public class MainMenuUI : MonoBehaviour
 
     [Header("Buttons")]
     [SerializeField] private Button playButton;
+    [SerializeField] private Button readButton;
     [SerializeField] private Button quitButton;
     [SerializeField] private bool autoBindButtonsByName = true;
+
+    [Header("存档")]
+    [SerializeField, Min(1)] private int saveSlotCount = 12;
 
     private bool clickListenersBound;
 
@@ -23,7 +28,9 @@ public class MainMenuUI : MonoBehaviour
     {
         EnsureEventSystem();
         EnsureRuntimeManagers();
+
         TryAutoResolveButtons();
+        TryAutoCreateReadButton();
         BindButtonClicks();
     }
 
@@ -45,10 +52,25 @@ public class MainMenuUI : MonoBehaviour
             return;
         }
 
-        if (submitAction == null && Input.GetKeyDown(KeyCode.Return))
+        if (submitAction == null && IsFallbackSubmitPressed())
         {
             PlayGame();
         }
+    }
+
+    private static bool IsFallbackSubmitPressed()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+        {
+            return false;
+        }
+
+        return keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame;
+#else
+        return false;
+#endif
     }
 
     public void PlayGame()
@@ -60,6 +82,13 @@ public class MainMenuUI : MonoBehaviour
         }
 
         LoadFallbackGameplayScene();
+    }
+
+    public void OpenReadSaves()
+    {
+        var saveManager = SaveGameManager.EnsureInstance();
+        saveManager.ConfigureSlotCount(saveSlotCount);
+        SaveSlotBrowserPanel.ShowFor(this, SavePanelMode.Load);
     }
 
     public void QuitGame()
@@ -83,6 +112,11 @@ public class MainMenuUI : MonoBehaviour
             playButton.onClick.AddListener(PlayGame);
         }
 
+        if (readButton != null)
+        {
+            readButton.onClick.AddListener(OpenReadSaves);
+        }
+
         if (quitButton != null)
         {
             quitButton.onClick.AddListener(QuitGame);
@@ -93,7 +127,7 @@ public class MainMenuUI : MonoBehaviour
 
     private void TryAutoResolveButtons()
     {
-        if (!autoBindButtonsByName || (playButton != null && quitButton != null))
+        if (!autoBindButtonsByName)
         {
             return;
         }
@@ -102,19 +136,93 @@ public class MainMenuUI : MonoBehaviour
         for (var i = 0; i < buttons.Length; i++)
         {
             var button = buttons[i];
-            var lower = button.name.ToLowerInvariant();
+            var searchText = BuildButtonSearchText(button);
 
-            if (playButton == null && (lower.Contains("play") || lower.Contains("start") || lower.Contains("begin") || lower.Contains("开始")))
+            if (playButton == null && ContainsAny(searchText, "play", "start", "begin", "开始"))
             {
                 playButton = button;
                 continue;
             }
 
-            if (quitButton == null && (lower.Contains("quit") || lower.Contains("exit") || lower.Contains("close") || lower.Contains("退出")))
+            if (readButton == null && ContainsAny(searchText, "read", "load", "continue", "读档", "读取", "继续"))
+            {
+                readButton = button;
+                continue;
+            }
+
+            if (quitButton == null && ContainsAny(searchText, "quit", "exit", "close", "退出"))
             {
                 quitButton = button;
             }
         }
+    }
+
+    private void TryAutoCreateReadButton()
+    {
+        if (readButton != null || playButton == null)
+        {
+            return;
+        }
+
+        var parent = playButton.transform.parent;
+        if (parent == null)
+        {
+            return;
+        }
+
+        var clone = Instantiate(playButton, parent);
+        clone.name = "Btn_Read";
+        clone.onClick.RemoveAllListeners();
+
+        var label = clone.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.text = "读档";
+        }
+
+        readButton = clone;
+    }
+
+    private static string BuildButtonSearchText(Button button)
+    {
+        if (button == null)
+        {
+            return string.Empty;
+        }
+
+        var searchText = button.name;
+
+        var tmp = button.GetComponentInChildren<TMP_Text>(true);
+        if (tmp != null)
+        {
+            searchText += " " + tmp.text;
+        }
+
+        var text = button.GetComponentInChildren<Text>(true);
+        if (text != null)
+        {
+            searchText += " " + text.text;
+        }
+
+        return searchText.ToLowerInvariant();
+    }
+
+    private static bool ContainsAny(string source, params string[] words)
+    {
+        if (string.IsNullOrWhiteSpace(source) || words == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < words.Length; i++)
+        {
+            if (!string.IsNullOrWhiteSpace(words[i]) && source.Contains(words[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void EnsureEventSystem()
@@ -147,6 +255,8 @@ public class MainMenuUI : MonoBehaviour
             var go = new GameObject("InputBindingsManager");
             go.AddComponent<InputBindingsManager>();
         }
+
+        SaveGameManager.EnsureInstance();
     }
 
     private static void LoadFallbackGameplayScene()
@@ -173,3 +283,5 @@ public class MainMenuUI : MonoBehaviour
         SceneManager.LoadScene(0);
     }
 }
+
+

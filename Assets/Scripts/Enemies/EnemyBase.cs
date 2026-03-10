@@ -37,6 +37,7 @@ public abstract class EnemyBase : MonoBehaviour
     private MeshRenderer hpTextRenderer;
     private Vector3 homePosition;
     private EnemyStatusController statusController;
+    private EnemySkillController skillController;
 
     private float hitStunTimer;
 
@@ -56,6 +57,7 @@ public abstract class EnemyBase : MonoBehaviour
         }
 
         homePosition = transform.position;
+        skillController = GetComponent<EnemySkillController>();
 
         if (showHealthText)
         {
@@ -107,11 +109,21 @@ public abstract class EnemyBase : MonoBehaviour
         if (distToPlayer <= attackRange)
         {
             state = EnemyState.Attack;
+            if (TryCastSkill(distToPlayer))
+            {
+                return;
+            }
+
             Attack();
         }
         else if (distToPlayer <= detectRange)
         {
             state = EnemyState.Chase;
+            if (TryCastSkill(distToPlayer))
+            {
+                return;
+            }
+
             Chase();
         }
         else
@@ -272,6 +284,16 @@ public abstract class EnemyBase : MonoBehaviour
         return speedX;
     }
 
+    private bool TryCastSkill(float distanceToPlayer)
+    {
+        if (skillController == null || player == null)
+        {
+            return false;
+        }
+
+        return skillController.TryCast(player, distanceToPlayer, state);
+    }
+
     private void TryFindPlayer()
     {
         var playerObj = GameObject.FindGameObjectWithTag("Player");
@@ -339,5 +361,6 @@ public abstract class EnemyBase : MonoBehaviour
         hpTextRenderer.sortingOrder = spriteRenderer.sortingOrder + 10;
     }
 }
+
 
 

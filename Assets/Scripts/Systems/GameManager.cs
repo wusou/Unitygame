@@ -14,6 +14,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private string mainMenuSceneName = "MainMenu";
 
     public IReadOnlyList<string> LevelNames => levelNames;
+    public IReadOnlyList<string> LevelScenes => levelScenes;
 
     public int RunCount { get; private set; } = 1;
     public int CurrentLevelIndex { get; private set; }
@@ -60,6 +61,11 @@ public class GameManager : MonoBehaviour
 
     public void LoadSceneByName(string sceneName)
     {
+        if (TryGetLevelIndexBySceneName(sceneName, out var levelIndex))
+        {
+            CurrentLevelIndex = levelIndex;
+        }
+
         LoadSceneWithFallback(sceneName);
     }
 
@@ -108,6 +114,56 @@ public class GameManager : MonoBehaviour
         return levelNames[CurrentLevelIndex];
     }
 
+    public bool TryGetLevelIndexBySceneName(string sceneName, out int index)
+    {
+        index = -1;
+        if (string.IsNullOrWhiteSpace(sceneName) || levelScenes == null)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < levelScenes.Length; i++)
+        {
+            if (string.Equals(levelScenes[i], sceneName, StringComparison.OrdinalIgnoreCase))
+            {
+                index = i;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void ApplyRuntimeState(int runCount, int currentLevelIndex, int difficulty, List<CorpseData> corpses)
+    {
+        RunCount = Mathf.Max(1, runCount);
+        Difficulty = Mathf.Max(1, difficulty);
+
+        if (levelScenes != null && levelScenes.Length > 0)
+        {
+            CurrentLevelIndex = Mathf.Clamp(currentLevelIndex, 0, levelScenes.Length - 1);
+        }
+        else
+        {
+            CurrentLevelIndex = Mathf.Max(0, currentLevelIndex);
+        }
+
+        AllCorpses.Clear();
+        if (corpses != null)
+        {
+            for (var i = 0; i < corpses.Count; i++)
+            {
+                var clone = CloneCorpse(corpses[i]);
+                if (clone != null)
+                {
+                    AllCorpses.Add(clone);
+                }
+            }
+        }
+
+        RunChanged?.Invoke(RunCount);
+    }
+
     public static bool SceneExistsInBuild(string sceneName)
     {
         if (string.IsNullOrWhiteSpace(sceneName))
@@ -131,6 +187,24 @@ public class GameManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static CorpseData CloneCorpse(CorpseData source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new CorpseData
+        {
+            Position = source.Position,
+            LevelIndex = source.LevelIndex,
+            RelicType = source.RelicType,
+            RelicValue = source.RelicValue,
+            RunNumber = source.RunNumber,
+            IsLooted = source.IsLooted
+        };
     }
 
     private void LoadLevelByIndex(int index)

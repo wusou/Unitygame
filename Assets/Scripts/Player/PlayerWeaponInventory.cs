@@ -186,6 +186,39 @@ public class PlayerWeaponInventory : MonoBehaviour
         return true;
     }
 
+    public void ReplaceWeaponsFromSave(IReadOnlyList<WeaponDefinition> loadedWeapons, int selectedIndex)
+    {
+        weapons.Clear();
+
+        if (loadedWeapons != null)
+        {
+            if (loadedWeapons.Count > maxWeaponSlots)
+            {
+                maxWeaponSlots = loadedWeapons.Count;
+            }
+
+            for (var i = 0; i < loadedWeapons.Count; i++)
+            {
+                var weapon = loadedWeapons[i];
+                if (weapon != null)
+                {
+                    weapons.Add(weapon);
+                }
+            }
+        }
+
+        if (weapons.Count == 0)
+        {
+            currentIndex = 0;
+        }
+        else
+        {
+            currentIndex = Mathf.Clamp(selectedIndex, 0, weapons.Count - 1);
+        }
+
+        NotifyWeaponChanged();
+    }
+
     private void NotifyWeaponChanged()
     {
         InventoryChanged?.Invoke();
