@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -20,6 +21,8 @@ public class PlayerController : MonoBehaviour
     [Header("单向平台下落")]
     [SerializeField] private LayerMask oneWayPlatformLayer;
     [SerializeField] private float dropDownDuration = 0.3f;
+    [SerializeField] private bool autoDetectOneWayByEffector = true;
+    [SerializeField, Min(0.5f)] private float dropDownInitialSpeed = 2f;
 
     [Header("Input System")]
     [SerializeField] private InputActionReference moveAction;
@@ -47,6 +50,8 @@ public class PlayerController : MonoBehaviour
     private float moveInput;
     private bool jumpQueued;
     private Coroutine dropRoutine;
+    private bool isDroppingThroughOneWay;
+    private readonly List<Collider2D> oneWayContacts = new();
 
     [HideInInspector] public float bonusSpeed;
 
@@ -123,12 +128,12 @@ public class PlayerController : MonoBehaviour
 
         jumpQueued = false;
 
-        // 蹲下+跳跃：从单向平台穿下去。
-        if (isCrouching && isGrounded && oneWayPlatformLayer.value != 0)
+        // 蹲下+跳跃：仅在脚下是单向平台时穿下去。
+        if (isCrouching && isGrounded && TryGetStandingOneWayPlatforms(oneWayContacts))
         {
             if (dropRoutine == null)
             {
-                dropRoutine = StartCoroutine(DropDownFromOneWayPlatform());
+                dropRoutine = StartCoroutine(DropDownFromOneWayPlatform(oneWayContacts.ToArray()));
             }
 
             return;
@@ -143,27 +148,62 @@ public class PlayerController : MonoBehaviour
         jumpsLeft--;
     }
 
-    private IEnumerator DropDownFromOneWayPlatform()
+    private IEnumerator DropDownFromOneWayPlatform(Collider2D[] oneWayColliders)
     {
+        isDroppingThroughOneWay = true;
         var playerLayer = gameObject.layer;
-        for (var layer = 0; layer < 32; layer++)
+
+        if (bodyCollider != null && oneWayColliders != null)
         {
-            if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+            for (var i = 0; i < oneWayColliders.Length; i++)
             {
-                Physics2D.IgnoreLayerCollision(playerLayer, layer, true);
+                var col = oneWayColliders[i];
+                if (col != null)
+                {
+                    Physics2D.IgnoreCollision(bodyCollider, col, true);
+                }
             }
         }
 
-        yield return new WaitForSeconds(dropDownDuration);
-
-        for (var layer = 0; layer < 32; layer++)
+        if (oneWayPlatformLayer.value != 0)
         {
-            if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+            for (var layer = 0; layer < 32; layer++)
             {
-                Physics2D.IgnoreLayerCollision(playerLayer, layer, false);
+                if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+                {
+                    Physics2D.IgnoreLayerCollision(playerLayer, layer, true);
+                }
             }
         }
 
+        rb.velocity = new Vector2(rb.velocity.x, -Mathf.Max(0.5f, dropDownInitialSpeed));
+
+        yield return new WaitForSeconds(Mathf.Max(0.05f, dropDownDuration));
+
+        if (bodyCollider != null && oneWayColliders != null)
+        {
+            for (var i = 0; i < oneWayColliders.Length; i++)
+            {
+                var col = oneWayColliders[i];
+                if (col != null)
+                {
+                    Physics2D.IgnoreCollision(bodyCollider, col, false);
+                }
+            }
+        }
+
+        if (oneWayPlatformLayer.value != 0)
+        {
+            for (var layer = 0; layer < 32; layer++)
+            {
+                if ((oneWayPlatformLayer.value & (1 << layer)) != 0)
+                {
+                    Physics2D.IgnoreLayerCollision(playerLayer, layer, false);
+                }
+            }
+        }
+
+        isDroppingThroughOneWay = false;
         dropRoutine = null;
     }
 
@@ -231,7 +271,18 @@ public class PlayerController : MonoBehaviour
 
     private void GroundCheck()
     {
-        int layerMask = groundLayer.value == 0 ? Physics2D.DefaultRaycastLayers : groundLayer.value;
+        if (isDroppingThroughOneWay)
+        {
+            isGrounded = false;
+            return;
+        }
+
+        var layerMask = ResolveGroundMask();
+        if (layerMask == 0)
+        {
+            isGrounded = false;
+            return;
+        }
 
         var overlapGrounded = false;
         if (groundCheck != null)
@@ -246,6 +297,89 @@ public class PlayerController : MonoBehaviour
         {
             jumpsLeft = maxJumps;
         }
+    }
+
+    private int ResolveGroundMask()
+    {
+        var configuredMask = groundLayer.value | oneWayPlatformLayer.value;
+        return configuredMask == 0 ? Physics2D.DefaultRaycastLayers : configuredMask;
+    }
+
+    private bool TryGetStandingOneWayPlatforms(List<Collider2D> results)
+    {
+        results.Clear();
+        if (bodyCollider == null)
+        {
+            return false;
+        }
+
+        var checkPosition = groundCheck != null ? (Vector2)groundCheck.position : (Vector2)bodyCollider.bounds.center;
+        var checkRadius = Mathf.Max(0.05f, groundCheckRadius + 0.03f);
+        var overlaps = Physics2D.OverlapCircleAll(checkPosition, checkRadius);
+
+        for (var i = 0; i < overlaps.Length; i++)
+        {
+            var col = overlaps[i];
+            if (col == null || col == bodyCollider || col.isTrigger)
+            {
+                continue;
+            }
+
+            if (!bodyCollider.IsTouching(col))
+            {
+                continue;
+            }
+
+            if (!IsOneWayPlatformCollider(col))
+            {
+                continue;
+            }
+
+            results.Add(col);
+        }
+
+        if (results.Count > 0)
+        {
+            return true;
+        }
+
+        return oneWayPlatformLayer.value != 0 && bodyCollider.IsTouchingLayers(oneWayPlatformLayer.value);
+    }
+
+    private bool IsOneWayPlatformCollider(Collider2D col)
+    {
+        if (col == null)
+        {
+            return false;
+        }
+
+        if (oneWayPlatformLayer.value != 0 && ((oneWayPlatformLayer.value & (1 << col.gameObject.layer)) != 0))
+        {
+            return true;
+        }
+
+        if (!autoDetectOneWayByEffector)
+        {
+            return false;
+        }
+
+        return HasOneWayEffector(col);
+    }
+
+    private static bool HasOneWayEffector(Collider2D col)
+    {
+        if (!col.usedByEffector)
+        {
+            return false;
+        }
+
+        var effector = col.GetComponent<PlatformEffector2D>();
+        if (effector == null)
+        {
+            effector = col.GetComponentInParent<PlatformEffector2D>();
+        }
+
+        return effector != null && effector.useOneWay;
     }
 
     private void HandleFacing()
@@ -333,9 +467,18 @@ public class PlayerController : MonoBehaviour
 
     private bool ReadCrouchHeld()
     {
-        if (crouchAction != null && crouchAction.action != null)
+        if (crouchAction != null && crouchAction.action != null && crouchAction.action.IsPressed())
         {
-            return crouchAction.action.IsPressed();
+            return true;
+        }
+
+        if (moveAction != null && moveAction.action != null)
+        {
+            var move = moveAction.action.ReadValue<Vector2>();
+            if (move.y < -0.5f)
+            {
+                return true;
+            }
         }
 
         var keyboard = Keyboard.current;
@@ -371,6 +514,15 @@ public class PlayerController : MonoBehaviour
         }
     }
 }
+
+
+
+
+
+
+
+
+
 
 
 
