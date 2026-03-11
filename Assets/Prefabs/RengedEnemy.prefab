@@ -44,7 +44,7 @@ GameObject:
   - component: {fileID: 5833752224306990403}
   - component: {fileID: 6358888384631275078}
   - component: {fileID: 8333692973039000144}
-  - component: {fileID: 473743574696439348}
+  - component: {fileID: 2981710263552803529}
   m_Layer: 7
   m_HasEditorInfo: 1
   m_Name: RengedEnemy
@@ -199,7 +199,7 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 1, y: 2}
   m_EdgeRadius: 0
---- !u!114 &473743574696439348
+--- !u!114 &2981710263552803529
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -208,23 +208,36 @@ MonoBehaviour:
   m_GameObject: {fileID: 2289526624978695822}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5235b49317753414cabe54155333666b, type: 3}
+  m_Script: {fileID: 11500000, guid: f233c45f68d202f4882132e1818a73aa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 60
   moveSpeed: 2.2
   detectRange: 6
-  attackRange: 400
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 64
+  attackRange: 1.2
+  patrolHalfWidth: 4
+  useChaseLeash: 1
+  chaseLeashDistance: 12
+  returnHomeStopDistance: 0.15
+  returnSpeedMultiplier: 1
+  knockbackDamping: 14
+  showHealthText: 1
+  healthTextOffset: {x: 0, y: 1.2, z: 0}
+  healthTextScale: 0.18
   leftPoint: {fileID: 5496532319579548568}
   rightPoint: {fileID: 1755540425231043351}
-  arrowPrefab: {fileID: 0}
+  patrolSpeedMultiplier: 0.8
+  weaponDefinition: {fileID: 11400000, guid: 45d89276a47c469499689c45fa70bb5a, type: 2}
+  attackPoint: {fileID: 0}
   arrowSpawn: {fileID: 5399035606039939782}
-  shootDamage: 12
-  shootCooldown: 1.8
+  fallbackProjectilePrefab: {fileID: 1971981316904992779, guid: e2f15da57b76e8b478a424deeca871d5, type: 3}
+  defaultMeleeRange: 1.5
+  useRangedKeepDistance: 1
   keepDistance: 3
+  keepDistanceTolerance: 1
+  animator: {fileID: 0}
+  meleeTrigger: Attack
+  projectileTrigger: Bow
 --- !u!1 &3741309758494081207
 GameObject:
   m_ObjectHideFlags: 0

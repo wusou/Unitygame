@@ -20,6 +20,6 @@ MonoBehaviour:
   attackMode: 0
   baseDamage: 10
   range: 1.5
-  cooldown: 0.5
+  cooldown: 0.1
   projectilePrefab: {fileID: 0}
   modifiers: []

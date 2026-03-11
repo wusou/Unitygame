@@ -26,7 +26,7 @@ Transform:
   m_GameObject: {fileID: 4495806134328369201}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.5, z: 0}
+  m_LocalPosition: {x: -0.04, y: -1.18, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -308,10 +308,18 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   dropDownDuration: 0.3
+  autoDetectOneWayByEffector: 1
+  dropDownInitialSpeed: 2
+  ladderLayer:
+    serializedVersion: 2
+    m_Bits: 1024
+  climbSpeed: 4.2
+  horizontalWhileClimbingMultiplier: 0.45
+  autoDetectLadderByAuthoring: 1
   moveAction: {fileID: 4985968441018033115, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   jumpAction: {fileID: 8704057690490279334, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   crouchAction: {fileID: 1720996247637943475, guid: 534d3345319391942a7c09a17c89f225, type: 3}
-  useHorizontalBounds: 1
+  useHorizontalBounds: 0
   minX: -20
   maxX: 120
   useKillY: 1
@@ -348,7 +356,7 @@ MonoBehaviour:
   dropSpawnPoint: {fileID: 0}
   dropForwardDistance: 0.8
   defaultMeleeRange: 1.5
-  fallbackProjectilePrefab: {fileID: 0}
+  fallbackProjectilePrefab: {fileID: 1249270576331933146, guid: 4122ca3e7433d794a8ee12b406b8edad, type: 3}
   attackPoint: {fileID: 7927890859527963972}
   arrowSpawn: {fileID: 5498577094908830548}
   autoFindSpawnPointsByName: 1

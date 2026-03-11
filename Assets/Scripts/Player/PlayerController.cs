@@ -542,7 +542,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleBounds()
     {
-        if (useHorizontalBounds)
+        if (useHorizontalBounds && maxX > minX + 0.01f)
         {
             var pos = transform.position;
             pos.x = Mathf.Clamp(pos.x, minX, maxX);
@@ -681,7 +681,7 @@ public class PlayerController : MonoBehaviour
             Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
         }
 
-        if (useHorizontalBounds)
+        if (useHorizontalBounds && maxX > minX + 0.01f)
         {
             Gizmos.color = Color.cyan;
             Gizmos.DrawLine(new Vector3(minX, transform.position.y - 5f), new Vector3(minX, transform.position.y + 5f));

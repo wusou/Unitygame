@@ -62,7 +62,12 @@ public class Arrow : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (hasHit)
+        if (hasHit || other == null)
+        {
+            return;
+        }
+
+        if (IsLadderCollider(other))
         {
             return;
         }
@@ -77,21 +82,35 @@ public class Arrow : MonoBehaviour
             return;
         }
 
-        if (other.CompareTag("Player"))
+        var isPlayerTarget = other.CompareTag("Player");
+        var isEnemyTarget = other.CompareTag("Enemy");
+
+        if (isPlayerTarget)
         {
             var playerHealth = other.GetComponent<PlayerHealth>();
             playerHealth?.TakeDamage(damage);
         }
-        else if (other.CompareTag("Enemy"))
+        else if (isEnemyTarget)
         {
             var enemy = other.GetComponent<EnemyBase>();
             enemy?.TakeDamage(damage);
+        }
+        else if (other.isTrigger)
+        {
+            // 交互触发器（梯子、门等）不应阻挡投射物。
+            return;
         }
 
         var payload = GetComponent<ProjectileEffectPayload>();
         payload?.ApplyTo(other.gameObject);
 
         ImpactAndDestroy();
+    }
+
+    private static bool IsLadderCollider(Collider2D other)
+    {
+        return other.GetComponent<LadderAuthoring>() != null ||
+               other.GetComponentInParent<LadderAuthoring>() != null;
     }
 
     private void ImpactAndDestroy()
@@ -142,3 +161,4 @@ public class Arrow : MonoBehaviour
         }
     }
 }
+

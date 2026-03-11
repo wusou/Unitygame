@@ -78,6 +78,7 @@ GameObject:
   - component: {fileID: 6735149428829698982}
   - component: {fileID: 7730353088327835818}
   - component: {fileID: 7679301292874134628}
+  - component: {fileID: 7022340946347035581}
   m_Layer: 7
   m_HasEditorInfo: 1
   m_Name: MeleeEnemy
@@ -258,8 +259,18 @@ MonoBehaviour:
   healthTextScale: 0.18
   leftPoint: {fileID: 7104617698487110254}
   rightPoint: {fileID: 1929722651656513346}
-  attackDamage: 20
-  attackCooldown: 0.8
+  patrolSpeedMultiplier: 0.8
+  weaponDefinition: {fileID: 11400000, guid: a93584705dc1f084db4ef6ffb545ba04, type: 2}
+  attackPoint: {fileID: 9009095025492026537}
+  arrowSpawn: {fileID: 9009095025492026537}
+  fallbackProjectilePrefab: {fileID: 1249270576331933146, guid: 4122ca3e7433d794a8ee12b406b8edad, type: 3}
+  defaultMeleeRange: 1.5
+  useRangedKeepDistance: 1
+  keepDistance: 3
+  keepDistanceTolerance: 1
+  animator: {fileID: 0}
+  meleeTrigger: Attack
+  projectileTrigger: Bow
 --- !u!114 &7679301292874134628
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -286,3 +297,18 @@ MonoBehaviour:
   dropOffsetXRange: {x: -0.6, y: 0.6}
   dropOffsetYRange: {x: 0, y: 0.35}
   autoPickupDroppedWeapon: 0
+--- !u!114 &7022340946347035581
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3537928765598226296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43954360c84f180428cdbde67af22081, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skillDefinitions: []
+  globalCooldown: 0.2
+  stopHorizontalVelocityOnCast: 1

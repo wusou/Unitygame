@@ -38,6 +38,7 @@ public abstract class EnemyBase : MonoBehaviour
     private Vector3 homePosition;
     private EnemyStatusController statusController;
     private EnemySkillController skillController;
+    private PlayerHealth playerHealth;
 
     private float hitStunTimer;
 
@@ -97,11 +98,15 @@ public abstract class EnemyBase : MonoBehaviour
             return;
         }
 
-        if (player == null)
+        if (!HasAlivePlayerTarget())
         {
             TryFindPlayer();
-            Patrol();
-            return;
+            if (!HasAlivePlayerTarget())
+            {
+                state = EnemyState.Patrol;
+                Patrol();
+                return;
+            }
         }
 
         var distToPlayer = Vector2.Distance(transform.position, player.position);
@@ -284,6 +289,27 @@ public abstract class EnemyBase : MonoBehaviour
         return speedX;
     }
 
+    private bool HasAlivePlayerTarget()
+    {
+        if (player == null)
+        {
+            playerHealth = null;
+            return false;
+        }
+
+        if (!player.gameObject.activeInHierarchy)
+        {
+            return false;
+        }
+
+        if (playerHealth == null || playerHealth.gameObject != player.gameObject)
+        {
+            playerHealth = player.GetComponent<PlayerHealth>();
+        }
+
+        return playerHealth == null || playerHealth.IsAlive;
+    }
+
     private bool TryCastSkill(float distanceToPlayer)
     {
         if (skillController == null || player == null)
@@ -300,7 +326,12 @@ public abstract class EnemyBase : MonoBehaviour
         if (playerObj != null)
         {
             player = playerObj.transform;
+            playerHealth = playerObj.GetComponent<PlayerHealth>();
+            return;
         }
+
+        player = null;
+        playerHealth = null;
     }
 
     private void UpdateHealthLabel()
@@ -361,6 +392,3 @@ public abstract class EnemyBase : MonoBehaviour
         hpTextRenderer.sortingOrder = spriteRenderer.sortingOrder + 10;
     }
 }
-
-
-

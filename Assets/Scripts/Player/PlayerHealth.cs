@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 [RequireComponent(typeof(SpriteRenderer), typeof(Rigidbody2D))]
 public class PlayerHealth : MonoBehaviour
@@ -21,6 +22,7 @@ public class PlayerHealth : MonoBehaviour
 
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
+    public bool IsAlive => isAlive;
 
     public event Action<int, int> HealthChanged;
     public event Action Died;
@@ -127,7 +129,7 @@ public class PlayerHealth : MonoBehaviour
 
         if (respawnAfterDeath)
         {
-            GameManager.Instance?.Respawn();
+            RequestRespawn();
         }
     }
 
@@ -137,6 +139,22 @@ public class PlayerHealth : MonoBehaviour
         for (var i = 0; i < spriteRenderers.Length; i++)
         {
             spriteRenderers[i].enabled = false;
+        }
+    }
+
+    private void RequestRespawn()
+    {
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.Respawn();
+            return;
+        }
+
+        // 兜底：即便场景中漏挂 GameManager，也能重载当前场景继续游玩。
+        var activeScene = SceneManager.GetActiveScene();
+        if (activeScene.IsValid())
+        {
+            SceneManager.LoadScene(activeScene.name);
         }
     }
 }

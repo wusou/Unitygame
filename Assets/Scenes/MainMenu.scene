@@ -1323,7 +1323,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   levelScenes:
-  - SampleScene
+  - Map_01
   levelNames:
   - "\u7B2C\u4E00\u7AE0\uFF1A\u6F14\u793A\u5173\u5361"
   victorySceneName: VictoryScreen
@@ -1424,7 +1424,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0fb20d10ee78b5d4fa999fdf644f900a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  submitAction: {fileID: 0}
+  submitAction: {fileID: -5303644331233180663, guid: 534d3345319391942a7c09a17c89f225, type: 3}
   playButton: {fileID: 724285076}
   readButton: {fileID: 2012170661}
   quitButton: {fileID: 763389163}
