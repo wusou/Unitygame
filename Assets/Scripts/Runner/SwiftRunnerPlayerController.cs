@@ -22,6 +22,9 @@ namespace SwiftRunner
         [SerializeField] private float sprintBoost = 4.5f;
         [SerializeField] private SpriteRenderer bodyRenderer;
         [SerializeField] private SpriteRenderer afterImageRenderer;
+        [SerializeField] private SpriteRenderer landingMarkerRenderer;
+        [SerializeField] private Rigidbody2D runnerBody;
+        [SerializeField] private CapsuleCollider2D bodyCollider;
         [SerializeField] private Sprite idleSprite;
         [SerializeField] private Sprite walkASprite;
         [SerializeField] private Sprite walkBSprite;
@@ -68,6 +71,7 @@ namespace SwiftRunner
         public bool IsAlive => alive;
         public bool IsDescending => !grounded && verticalVelocity <= 0f;
         public float HitboxHalfWidth => 0.45f;
+        public float VerticalVelocity => verticalVelocity;
 
         public string ControlSummary => ResolveControlSummary();
 
@@ -84,12 +88,16 @@ namespace SwiftRunner
             canDoubleJump = true;
             sprintToggled = false;
             bodyRenderer ??= GetComponent<SpriteRenderer>();
+            runnerBody ??= GetComponent<Rigidbody2D>();
+            bodyCollider ??= GetComponent<CapsuleCollider2D>();
+            landingMarkerRenderer ??= transform.Find("LandingMarker")?.GetComponent<SpriteRenderer>();
             ApplyVisualState();
         }
 
         public void ConfigureVisuals(
             SpriteRenderer primaryRenderer,
             SpriteRenderer trailRenderer,
+            SpriteRenderer landingMarker,
             Sprite idle,
             Sprite walkA,
             Sprite walkB,
@@ -99,6 +107,7 @@ namespace SwiftRunner
         {
             bodyRenderer = primaryRenderer;
             afterImageRenderer = trailRenderer;
+            landingMarkerRenderer = landingMarker;
             idleSprite = idle;
             walkASprite = walkA;
             walkBSprite = walkB;
@@ -116,6 +125,17 @@ namespace SwiftRunner
             {
                 afterImageRenderer.sprite = idleSprite;
             }
+
+            if (landingMarkerRenderer != null)
+            {
+                landingMarkerRenderer.enabled = false;
+            }
+        }
+
+        public void ConfigurePhysics(Rigidbody2D physicsBody, CapsuleCollider2D collisionBody)
+        {
+            runnerBody = physicsBody;
+            bodyCollider = collisionBody;
         }
 
         private void OnEnable()
@@ -286,8 +306,18 @@ namespace SwiftRunner
                 }
             }
 
-            transform.position = new Vector3(forwardX, currentLaneY + verticalOffset, 0f);
+            var nextPosition = new Vector3(forwardX, currentLaneY + verticalOffset, 0f);
+            if (runnerBody != null)
+            {
+                runnerBody.MovePosition(nextPosition);
+            }
+            else
+            {
+                transform.position = nextPosition;
+            }
+
             ApplyVisualState();
+            UpdateLandingMarker();
 
             if (stompQueued && controller.TryResolveStomp(this, out _))
             {
@@ -332,6 +362,26 @@ namespace SwiftRunner
             return Mathf.Abs(forwardX - x) <= HitboxHalfWidth + halfWidth;
         }
 
+        public bool IsOverlappingCollider(Collider2D collider)
+        {
+            if (collider == null)
+            {
+                return false;
+            }
+
+            return GetBodyBounds().Intersects(collider.bounds);
+        }
+
+        public bool IsAboveColliderTop(Collider2D collider, float tolerance)
+        {
+            if (collider == null)
+            {
+                return false;
+            }
+
+            return GetBodyBounds().min.y >= collider.bounds.max.y - tolerance;
+        }
+
         public bool IsLaneCompatible(int laneIndex)
         {
             return laneIndex < 0 || laneIndex == currentLaneIndex;
@@ -340,6 +390,19 @@ namespace SwiftRunner
         public bool ClearsHeight(float requiredHeight)
         {
             return verticalOffset >= requiredHeight;
+        }
+
+        public bool IsWithinLandingWindow(float contactHeight, float tolerance)
+        {
+            if (grounded)
+            {
+                return Mathf.Abs(verticalOffset - contactHeight) <= tolerance;
+            }
+
+            return IsDescending &&
+                   verticalVelocity <= 0f &&
+                   verticalOffset <= contactHeight + tolerance &&
+                   verticalOffset >= contactHeight - tolerance;
         }
 
         private void HandleLaneInput(float verticalInput)
@@ -434,6 +497,45 @@ namespace SwiftRunner
 
             transform.localScale = new Vector3(1f, scaleY, 1f);
             UpdateSprites();
+        }
+
+        private void UpdateLandingMarker()
+        {
+            if (landingMarkerRenderer == null)
+            {
+                return;
+            }
+
+            if (grounded || !alive)
+            {
+                landingMarkerRenderer.enabled = false;
+                return;
+            }
+
+            var markerPosition = new Vector3(forwardX, controller.GetLaneY(targetLaneIndex) - 0.92f, 0f);
+            var markerColor = stompQueued
+                ? new Color(1f, 0.78f, 0.26f, 0.9f)
+                : new Color(0.98f, 0.96f, 0.62f, 0.65f);
+
+            if (stompQueued && controller.TryGetStompPreview(this, out var previewEnemy))
+            {
+                markerPosition = new Vector3(previewEnemy.ForwardX, controller.GetLaneY(previewEnemy.LaneIndex) - 0.92f, 0f);
+                markerColor = new Color(1f, 0.55f, 0.22f, 0.95f);
+            }
+
+            landingMarkerRenderer.enabled = true;
+            landingMarkerRenderer.transform.position = markerPosition;
+            landingMarkerRenderer.color = markerColor;
+        }
+
+        private Bounds GetBodyBounds()
+        {
+            if (bodyCollider != null)
+            {
+                return bodyCollider.bounds;
+            }
+
+            return new Bounds(transform.position, new Vector3(0.9f, 1.4f, 0f));
         }
 
         private void UpdateSprites()

@@ -11,6 +11,7 @@ namespace SwiftRunner
         [SerializeField] private float clearanceHeight;
         [SerializeField] private float penalty;
         [SerializeField] private SwiftRunnerObstacleType obstacleType;
+        [SerializeField] private Collider2D[] contactColliders;
         private bool consumed;
 
         public SwiftRunnerObstacleType ObstacleType => obstacleType;
@@ -33,6 +34,11 @@ namespace SwiftRunner
             consumed = false;
         }
 
+        public void SetContactColliders(params Collider2D[] colliders)
+        {
+            contactColliders = colliders;
+        }
+
         public void Resolve(SwiftRunnerPlayerController player)
         {
             if (player == null || consumed)
@@ -40,7 +46,7 @@ namespace SwiftRunner
                 return;
             }
 
-            if (!player.IsLaneCompatible(laneIndex) || !player.IsOverlappingX(forwardX, halfWidth))
+            if (!player.IsLaneCompatible(laneIndex) || !IsPlayerTouching(player))
             {
                 return;
             }
@@ -70,7 +76,7 @@ namespace SwiftRunner
                     break;
 
                 case SwiftRunnerObstacleType.Water:
-                    if (IsInsideWaterCore(player) && !player.ClearsHeight(clearanceHeight))
+                    if (!player.ClearsHeight(clearanceHeight))
                     {
                         controller.KillRunner("掉进了水里。");
                     }
@@ -91,6 +97,24 @@ namespace SwiftRunner
 
             var forgivingHalfWidth = Mathf.Max(0.1f, halfWidth - 0.42f);
             return Mathf.Abs(player.ForwardX - forwardX) <= forgivingHalfWidth;
+        }
+
+        private bool IsPlayerTouching(SwiftRunnerPlayerController player)
+        {
+            if (contactColliders != null && contactColliders.Length > 0)
+            {
+                for (var index = 0; index < contactColliders.Length; index++)
+                {
+                    if (player.IsOverlappingCollider(contactColliders[index]))
+                    {
+                        return obstacleType != SwiftRunnerObstacleType.Water || IsInsideWaterCore(player);
+                    }
+                }
+
+                return false;
+            }
+
+            return player.IsOverlappingX(forwardX, halfWidth);
         }
     }
 }

@@ -6,6 +6,8 @@ namespace SwiftRunner
     {
         [SerializeField] private int laneIndex;
         [SerializeField] private float forwardX;
+        [SerializeField] private Collider2D bodyCollider;
+        [SerializeField] private Collider2D stompCollider;
 
         private SpriteRenderer[] renderers;
 
@@ -26,21 +28,26 @@ namespace SwiftRunner
             CacheRenderers();
         }
 
+        public void SetContactColliders(Collider2D bodyContact, Collider2D stompContact)
+        {
+            bodyCollider = bodyContact;
+            stompCollider = stompContact;
+        }
+
         public bool CanBeStompedBy(SwiftRunnerPlayerController player)
         {
             return IsAlive &&
                    player.IsDescending &&
                    player.IsLaneCompatible(LaneIndex) &&
-                   player.IsOverlappingX(ForwardX, 0.62f) &&
-                   player.VerticalOffset >= 0.78f;
+                   player.IsOverlappingCollider(stompCollider);
         }
 
         public bool IsThreatening(SwiftRunnerPlayerController player)
         {
             return IsAlive &&
                    player.IsLaneCompatible(LaneIndex) &&
-                   player.IsOverlappingX(ForwardX, 0.52f) &&
-                   player.VerticalOffset < 0.74f;
+                   player.IsOverlappingCollider(bodyCollider) &&
+                   !player.IsAboveColliderTop(bodyCollider, 0.12f);
         }
 
         public void Kill(SwiftRunnerKillMethod method)

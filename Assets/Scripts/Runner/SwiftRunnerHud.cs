@@ -13,6 +13,7 @@ namespace SwiftRunner
         private TextMeshProUGUI controlsText;
         private TextMeshProUGUI pursuitText;
         private Image pursuitFill;
+        private RectTransform pursuitFillRect;
 
         public void Initialize()
         {
@@ -28,6 +29,7 @@ namespace SwiftRunner
             pursuitText = FindOrCreateLabel(topRightPanel, "PursuitLabel", Vector2.zero, 22f, TextAlignmentOptions.TopRight);
             hintText = FindOrCreateLabel(bottomHintPanel, "Hint", Vector2.zero, 24f, TextAlignmentOptions.Bottom);
             pursuitFill = FindOrCreatePursuitBar(topRightPanel);
+            pursuitFillRect = pursuitFill != null ? pursuitFill.rectTransform : null;
             statusText.alpha = 0.9f;
             controlsText.alpha = 0.92f;
         }
@@ -61,7 +63,12 @@ namespace SwiftRunner
 
             if (pursuitFill != null)
             {
-                pursuitFill.fillAmount = Mathf.Clamp01(pursuitProgress);
+                var clampedProgress = Mathf.Clamp01(pursuitProgress);
+                if (pursuitFillRect != null)
+                {
+                    pursuitFillRect.sizeDelta = new Vector2(260f * clampedProgress, 0f);
+                }
+
                 pursuitFill.color = Color.Lerp(new Color(0.3f, 0.9f, 0.45f, 0.95f), new Color(1f, 0.3f, 0.24f, 0.95f), pursuitProgress);
             }
         }
@@ -185,11 +192,12 @@ namespace SwiftRunner
             var background = EnsureImage(barRoot, "Background", new Color(0f, 0f, 0f, 0.45f), Image.Type.Sliced);
             Stretch(background.rectTransform);
 
-            var fill = EnsureImage(barRoot, "Fill", new Color(0.3f, 0.9f, 0.45f, 0.95f), Image.Type.Filled);
-            Stretch(fill.rectTransform);
-            fill.fillMethod = Image.FillMethod.Horizontal;
-            fill.fillOrigin = 0;
-            fill.fillAmount = 0f;
+            var fill = EnsureImage(barRoot, "Fill", new Color(0.3f, 0.9f, 0.45f, 0.95f), Image.Type.Simple);
+            fill.rectTransform.anchorMin = new Vector2(0f, 0f);
+            fill.rectTransform.anchorMax = new Vector2(0f, 1f);
+            fill.rectTransform.pivot = new Vector2(0f, 0.5f);
+            fill.rectTransform.anchoredPosition = Vector2.zero;
+            fill.rectTransform.sizeDelta = new Vector2(0f, 0f);
             return fill;
         }
 

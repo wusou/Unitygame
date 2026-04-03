@@ -51,6 +51,7 @@ namespace SwiftRunner
         private const string WallSpritePath = "Assets/Art/Tilesets/Tiles/bricks_grey.png";
         private const string GateFrameSpritePath = "Assets/Art/Tilesets/Tiles/brick_brown.png";
         private const string BannerSpritePath = "Assets/Art/Tilesets/Tiles/flag_yellow_a.png";
+        private const string LandingMarkerSpritePath = "Assets/Art/UI/PNG/Extra/Default/button_round_line.png";
         private static readonly float[] DefaultLaneCenters = { -2.6f, 0f, 2.6f };
 
         [SerializeField] private SwiftRunnerSceneMode sceneMode = SwiftRunnerSceneMode.RuntimeGenerated;
@@ -310,18 +311,42 @@ namespace SwiftRunner
                 sortingOrder: 25,
                 fallbackToBlock: false);
 
+            var landingMarker = SwiftRunnerVisualFactory.CreateSpriteObject(
+                "LandingMarker",
+                playerObject.transform,
+                new Vector3(0f, -0.92f, 0f),
+                new Vector2(1.05f, 0.26f),
+                LandingMarkerSpritePath,
+                new Color(0.98f, 0.96f, 0.62f, 0.65f),
+                sortingOrder: 22,
+                fallbackToBlock: true);
+
+            var rigidbody = playerObject.AddComponent<Rigidbody2D>();
+            rigidbody.bodyType = RigidbodyType2D.Kinematic;
+            rigidbody.gravityScale = 0f;
+            rigidbody.freezeRotation = true;
+            rigidbody.interpolation = RigidbodyInterpolation2D.Interpolate;
+
+            var collider = playerObject.AddComponent<CapsuleCollider2D>();
+            collider.isTrigger = true;
+            collider.direction = CapsuleDirection2D.Vertical;
+            collider.offset = new Vector2(0f, 0.02f);
+            collider.size = new Vector2(0.82f, 1.42f);
+
             playerObject.AddComponent<PlayerInput>();
 
             var controllerComponent = playerObject.AddComponent<SwiftRunnerPlayerController>();
             controllerComponent.ConfigureVisuals(
                 playerObject.GetComponent<SpriteRenderer>(),
                 trail.GetComponent<SpriteRenderer>(),
+                landingMarker.GetComponent<SpriteRenderer>(),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerIdleSpritePath),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerWalkASpritePath),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerWalkBSpritePath),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerJumpSpritePath),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerDuckSpritePath),
                 SwiftRunnerVisualFactory.LoadSprite(PlayerHitSpritePath));
+            controllerComponent.ConfigurePhysics(rigidbody, collider);
             controllerComponent.Initialize(controller, startLaneIndex: 1);
             return controllerComponent;
         }
@@ -467,11 +492,11 @@ namespace SwiftRunner
             var enemyRoot = CreateGroup("Enemies", parent);
 
             // The opening jump should be reliable, so the first gap is shorter and the first guard lands later.
-            CreateWater(hazardRoot, controller, 15f, 3.1f);
+            CreateWater(hazardRoot, controller, laneCenters, 15f, 3.1f);
             CreateEnemy(enemyRoot, controller, 19.6f, 1, laneCenters, "WallGuard_A");
-            CreateWater(hazardRoot, controller, 23f, 3.4f);
+            CreateWater(hazardRoot, controller, laneCenters, 23f, 3.4f);
             CreateEnemy(enemyRoot, controller, 26.5f, 1, laneCenters, "WallGuard_B");
-            CreateWater(hazardRoot, controller, 32f, 4f);
+            CreateWater(hazardRoot, controller, laneCenters, 32f, 4f);
             CreateEnemy(enemyRoot, controller, 35.2f, 1, laneCenters, "WallGuard_C");
             CreateEnemy(enemyRoot, controller, 38.1f, 1, laneCenters, "WallGuard_D");
 
@@ -560,6 +585,7 @@ namespace SwiftRunner
 
             var trigger = triggerVolume.AddComponent<SwiftRunnerObstacle>();
             trigger.Configure(controller, SwiftRunnerObstacleType.FinishGate, FinishLineX, -1, 0.9f, 0f, 0f);
+            trigger.SetContactColliders(CreateBoxTrigger(triggerVolume.transform, "FinishTrigger", Vector2.zero, new Vector2(1.8f, 8.6f)));
             controller.RegisterObstacle(trigger);
 
             var finishAuthoring = gateRoot.gameObject.AddComponent<SwiftRunnerFinishGateAuthoring>();
@@ -578,8 +604,11 @@ namespace SwiftRunner
             var spritePath = ResolveEnemySpritePath(objectName);
             var tint = ResolveEnemyTint(objectName);
             var enemy = SwiftRunnerVisualFactory.CreateEnemyVisual(objectName, parent, new Vector3(x, laneCenters[laneIndex], 0f), spritePath, tint);
+            var bodyContact = CreateBoxTrigger(enemy.transform, "BodyTrigger", new Vector2(0f, 0.38f), new Vector2(0.86f, 1.08f));
+            var stompContact = CreateBoxTrigger(enemy.transform, "StompTrigger", new Vector2(0f, 0.98f), new Vector2(0.72f, 0.22f));
             var component = enemy.AddComponent<SwiftRunnerEnemy>();
             component.Configure(controller, laneIndex, x);
+            component.SetContactColliders(bodyContact, stompContact);
             controller.RegisterEnemy(component);
         }
 
@@ -597,6 +626,7 @@ namespace SwiftRunner
                 new Color(0.46f, 0.28f, 0.1f, 1f));
             var component = obstacle.AddComponent<SwiftRunnerObstacle>();
             component.Configure(controller, SwiftRunnerObstacleType.Slowdown, x, laneIndex, 0.82f, 1.15f, 4.4f);
+            component.SetContactColliders(CreateBoxTrigger(obstacle.transform, "SlowdownTrigger", new Vector2(0f, 0.1f), new Vector2(1.1f, 0.86f)));
             controller.RegisterObstacle(component);
         }
 
@@ -613,10 +643,11 @@ namespace SwiftRunner
                 new Color(0.63f, 0.48f, 0.24f, 1f));
             var component = barrier.AddComponent<SwiftRunnerObstacle>();
             component.Configure(controller, SwiftRunnerObstacleType.LowBarrier, x, laneIndex, 0.95f, 1.15f, 0f);
+            component.SetContactColliders(CreateBoxTrigger(barrier.transform, "LowBarrierTrigger", new Vector2(0f, 0.1f), new Vector2(1.45f, 0.42f)));
             controller.RegisterObstacle(component);
         }
 
-        private static void CreateWater(Transform parent, SwiftRunnerGameController controller, float x, float width)
+        private static void CreateWater(Transform parent, SwiftRunnerGameController controller, IReadOnlyList<float> laneCenters, float x, float width)
         {
             var water = SwiftRunnerVisualFactory.CreateTexturedBlock(
                 $"Water_{x:0}",
@@ -629,6 +660,13 @@ namespace SwiftRunner
                 new Color(0.12f, 0.41f, 0.56f, 1f));
             var component = water.AddComponent<SwiftRunnerObstacle>();
             component.Configure(controller, SwiftRunnerObstacleType.Water, x, -1, width * 0.5f, 1.1f, 0f);
+            var contactColliders = new Collider2D[laneCenters.Count];
+            for (var index = 0; index < laneCenters.Count; index++)
+            {
+                contactColliders[index] = CreateBoxTrigger(water.transform, $"WaterSurface_{index}", new Vector2(0f, laneCenters[index] + 4.25f), new Vector2(Mathf.Max(0.8f, width - 0.6f), 0.36f));
+            }
+
+            component.SetContactColliders(contactColliders);
             controller.RegisterObstacle(component);
         }
 
@@ -645,7 +683,19 @@ namespace SwiftRunner
                 new Color(0.56f, 0.56f, 0.6f, 1f));
             var component = wall.AddComponent<SwiftRunnerObstacle>();
             component.Configure(controller, SwiftRunnerObstacleType.KillWall, x, -1, width * 0.5f, clearanceHeight, 0f);
+            component.SetContactColliders(CreateBoxTrigger(wall.transform, "WallTrigger", new Vector2(0f, 0f), new Vector2(Mathf.Max(0.4f, width), 6.8f)));
             controller.RegisterObstacle(component);
+        }
+
+        private static BoxCollider2D CreateBoxTrigger(Transform parent, string objectName, Vector2 localOffset, Vector2 size)
+        {
+            var triggerObject = new GameObject(objectName);
+            triggerObject.transform.SetParent(parent, false);
+            triggerObject.transform.localPosition = localOffset;
+            var collider = triggerObject.AddComponent<BoxCollider2D>();
+            collider.isTrigger = true;
+            collider.size = size;
+            return collider;
         }
 
         private static string ResolveEnemySpritePath(string objectName)

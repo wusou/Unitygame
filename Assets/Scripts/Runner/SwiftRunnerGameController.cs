@@ -177,6 +177,32 @@ namespace SwiftRunner
             return false;
         }
 
+        public bool TryGetStompPreview(SwiftRunnerPlayerController runner, out SwiftRunnerEnemy previewEnemy)
+        {
+            previewEnemy = null;
+            var bestDistance = float.MaxValue;
+
+            for (var index = 0; index < enemies.Count; index++)
+            {
+                var enemy = enemies[index];
+                if (enemy == null || !enemy.IsAlive || enemy.LaneIndex != runner.CurrentLaneIndex)
+                {
+                    continue;
+                }
+
+                var delta = Mathf.Abs(enemy.ForwardX - runner.ForwardX);
+                if (delta > 1.2f || delta >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = delta;
+                previewEnemy = enemy;
+            }
+
+            return previewEnemy != null;
+        }
+
         public void TickRunner(SwiftRunnerPlayerController runner, float deltaTime)
         {
             if (runner == null || gameEnded)
